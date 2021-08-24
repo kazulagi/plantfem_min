@@ -12,10 +12,28 @@ module ArrayClass
     !interface newArray
     !    module procedure newArrayReal
     !end interface
+    interface interpolate
+        module procedure :: interpolateReal64
+    end interface
 
+    interface rotationMatrix
+        module procedure :: rotationMatrixReal64
+    end interface
+
+    interface farthestVector
+        module procedure :: farthestVectorReal64 
+    end interface
+
+    interface hstack
+        module procedure :: hstackInt32Vector2,hstackInt32Vector3, hstackReal64Vector2,hstackReal64Vector3
+    end interface
+
+    interface dot_product_omp
+        module procedure :: dot_product_omp
+    end interface
 
     interface zeros
-        module procedure :: zerosRealArray, zerosRealVector
+        module procedure :: zerosRealArray, zerosRealVector,zerosRealArray3,zerosRealArray4,zerosRealArray5
     end interface
 
     interface increment
@@ -23,6 +41,9 @@ module ArrayClass
             incrementRealArray, incrementIntArray 
     end interface
 
+    interface average
+        module procedure :: averageInt32, averageReal64
+    end interface
 
     interface arange
         module procedure :: arangeRealVector
@@ -70,6 +91,7 @@ module ArrayClass
         module procedure TrimArrayInt, TrimArrayReal
     end interface TrimArray
 
+    
     
 
     interface open
@@ -183,6 +205,10 @@ module ArrayClass
         module procedure :: removeArrayReal,removeArrayInt,removeArrayReal3rdOrder
     end interface remove
 
+    interface searchAndRemove
+        module procedure :: searchAndRemoveInt
+    end interface
+
     interface removeArray
         module procedure :: removeArrayReal,removeArrayInt,removeArrayReal3rdOrder
     end interface removeArray
@@ -198,6 +224,10 @@ module ArrayClass
 
     interface countifSame
         module procedure ::countifSameIntArray,countifSameIntVec,countifSameIntArrayVec,countifSameIntVecArray
+    end interface
+
+    interface sameAsGroup
+        module procedure :: sameAsGroupintVec
     end interface
 
     interface countif
@@ -226,7 +256,7 @@ module ArrayClass
     end interface
 
     interface Angles
-        module procedure :: anglesReal3D
+        module procedure :: anglesReal3D,anglesReal2D
     end interface
 
     interface unwindLine
@@ -4036,6 +4066,27 @@ function getext(char) result(ext)
 end function
 
 ! ############################################################
+function anglesReal2D(x) result(ret)
+    real(real64), intent(in) :: x(2)
+    type(Math_) :: math
+    real(real64) :: ret,r
+
+    r = norm(x)
+    ! angle from (0,1)
+    if(x(1)>=0.0d0 .and. x(2)>=0.0d0 )then
+        ret = acos( x(1)/r )
+    elseif(x(1)<=0.0d0 .and. x(2)>=0.0d0 )then
+        ret = acos( x(1)/r )
+    elseif(x(1)<=0.0d0 .and. x(2)<=0.0d0 )then
+        ret = 2.0d0*math%PI - acos( x(1)/r )
+    else
+        ret = 2.0d0*math%PI - acos( x(1)/r )
+    endif
+
+end function
+! ############################################################
+
+! ############################################################
 function anglesReal3D(vector1, vector2) result(angles)
     real(real64), intent(in) :: vector1(3), vector2(3)
     real(real64) :: angles(3),unit1(3),unit2(3),e3(3)
@@ -4356,6 +4407,46 @@ function zerosRealArray(size1, size2) result(array)
 end function
 
 ! ############################################################
+
+
+! ############################################################
+function zerosRealArray3(size1, size2,size3) result(array)
+    integer(int32),intent(in) :: size1, size2, size3
+    real(real64),allocatable :: array(:,:,:)
+
+    allocate(array(size1, size2,size3) )
+    array(:,:,:) = 0.0d0
+
+end function
+
+! ############################################################
+
+! ############################################################
+function zerosRealArray4(size1, size2,size3,size4) result(array)
+    integer(int32),intent(in) :: size1, size2,size3,size4
+    real(real64),allocatable :: array(:,:,:,:)
+
+    allocate(array(size1, size2, size3, size4) )
+    array(:,:, :, :) = 0.0d0
+
+end function
+
+! ############################################################
+
+! ############################################################
+function zerosRealArray5(size1, size2,size3,size4,size5) result(array)
+    integer(int32),intent(in) :: size1, size2,size3,size4,size5
+    real(real64),allocatable :: array(:,:,:,:,:)
+
+    allocate(array(size1, size2,size3,size4,size5) )
+    array(:,:,:,:,:) = 0.0d0
+
+end function
+
+! ############################################################
+
+! ############################################################
+
 function incrementRealVector(vector) result(dvector)
     real(real64),intent(in) :: vector(:)
     real(real64),allocatable ::  dvector(:)
@@ -4745,5 +4836,381 @@ function judgeCrossing2D(L1,L2) result(cross)
 end function
 ! ############################################################
 
+function sameAsGroupintVec(vec1, vec2) result(ret)
+    integer(int32),intent(in) :: vec1(:)
+    integer(int32),intent(in) :: vec2(:)
+    logical :: sameValueExists
+    integer(int32) :: i,j
+    logical :: ret
+
+    if(size(vec1)/=size(vec2) )then
+        ret = .false.
+        return
+    endif
+
+
+    if(maxval(vec1)/=maxval(vec2) .or. minval(vec1)/=minval(vec2) ) then
+        ret = .false.
+        return
+    endif
+    
+    if(sum(vec1)/=sum(vec2) ) then
+        ret = .false.
+        return
+    endif
+
+
+
+    
+    do i=1,size(vec1)
+        sameValueExists = .false.
+        do j=1,size(vec2)
+            if(vec1(i)==vec2(j) )then
+                sameValueExists = .true.
+                exit
+            endif
+        enddo
+        if(sameValueExists)then
+            cycle
+        else
+            ret = .false.
+            return
+        endif
+    enddo
+
+    ret = .true.
+
+
+end function
+
+subroutine searchAndRemoveInt(vec,eq,leq,geq)
+    integer(int32),allocatable,intent(inout) :: vec(:)
+    integer(int32),optional,intent(in) :: eq,leq,geq
+    integer(int32),allocatable :: buf(:)
+    integer(int32):: countnum,i,k
+
+    if(present(eq) )then
+        countnum=0
+        do i=1,size(vec)
+            if(vec(i)==eq )then
+                countnum = countnum + 1
+            endif
+        enddo
+
+        k = size(vec) - countnum
+        allocate(buf( k ) )
+        countnum=0
+        do i=1,size(vec)
+            if(vec(i) /= eq )then
+                countnum=countnum+1
+                buf(countnum) = vec(i)
+            endif
+        enddo
+        vec = buf
+    endif
+
+
+    if(present(leq) )then
+        countnum=0
+        do i=1,size(vec)
+            if(vec(i)<=leq )then
+                countnum = countnum + 1
+            endif
+        enddo
+
+        k = size(vec) - countnum
+        allocate(buf( k ) )
+        countnum=0
+        do i=1,size(vec)
+            if(vec(i) > leq )then
+                countnum=countnum+1
+                buf(countnum) = vec(i)
+            endif
+        enddo
+        vec = buf
+    endif
+
+    if(present(geq) )then
+        countnum=0
+        do i=1,size(vec)
+            if(vec(i)>=geq )then
+                countnum = countnum + 1
+            endif
+        enddo
+
+        k = size(vec) - countnum
+        allocate(buf( k ) )
+        countnum=0
+        do i=1,size(vec)
+            if(vec(i) < geq )then
+                countnum=countnum+1
+                buf(countnum) = vec(i)
+            endif
+        enddo
+        vec = buf
+    endif
+
+end subroutine
+
+function dot_product_omp(a, b, omp) result(dp)
+    real(real64),intent(in) :: a(:),b(:)
+    real(real64) :: dp
+    integer(int32) :: i
+    logical,intent(in) :: omp
+
+    if(omp)then
+        dp = 0.0d0
+        !$omp parallel do reduction(+:dp)
+        do i=1,size(a)
+            dp = dp + a(i)*b(i)
+        enddo
+        !$omp end parallel do
+    else
+        dp =dot_product(a,b)
+    endif
+end function
+
+
+! ##############################################################
+function hstackInt32Vector2(Vec1, vec2) result(ret)
+    integer(int32),allocatable,intent(in) :: vec1(:),vec2(:)
+    integer(int32),allocatable :: ret(:)
+
+    if(.not.allocated(vec2).and. .not.allocated(vec1) )then
+        return
+    endif
+
+    if(.not.allocated(vec1) )then
+        ret = vec2
+        return
+    endif
+
+
+    if(.not.allocated(vec2) )then
+        ret = vec1
+        return
+    endif
+
+    if( size(vec1)==0 .and. size(vec2)==0 )then
+        return
+    endif
+
+
+    if( size(vec1)==0  )then
+        ret = vec2
+        return
+    endif
+
+    if( size(vec2)==0  )then
+        ret = vec1
+        return
+    endif
+    
+    allocate(ret(  size(vec1) + size(vec2) ) )
+    ret(1:size(vec1) ) = vec1(:)
+    ret(size(vec1)+1: ) = vec2(:)
+
+end function
+! ##############################################################
+
+! ##############################################################
+function hstackInt32Vector3(vec1, vec2,vec3) result(ret)
+    integer(int32),allocatable,intent(in) :: vec1(:),vec2(:),vec3(:)
+    integer(int32),allocatable :: ret(:)
+
+    if(.not.allocated(vec2).and. .not.allocated(vec1) )then
+        if( .not.allocated(vec3) )then
+            return
+        endif
+    endif
+
+    if(.not.allocated(vec1) )then
+        ret =  hstackInt32Vector2(vec2, vec3)
+        return
+    endif
+
+
+    if(.not.allocated(vec2) )then
+        ret =  hstackInt32Vector2(vec1, vec3)
+        return
+    endif
+
+    if(.not.allocated(vec3) )then
+        ret =  hstackInt32Vector2(vec1, vec2)
+        return
+    endif
+
+    allocate(ret(  size(vec1) + size(vec2)+ size(vec3) ) )
+    ret(           1:size(vec1)            ) = vec1(:)
+    ret(size(vec1)+1:size(vec1)+size(vec2) ) = vec2(:)
+    ret(size(vec1)+size(vec2)+1:           ) = vec3(:)
+
+end function
+! ##############################################################
+
+
+! ##############################################################
+function hstackreal64Vector2(Vec1, vec2) result(ret)
+    real(real64),allocatable,intent(in) :: vec1(:),vec2(:)
+    real(real64),allocatable :: ret(:)
+
+
+    if(.not.allocated(vec2).and. .not.allocated(vec1) )then
+        return
+    endif
+
+    if(.not.allocated(vec1) )then
+        ret = vec2
+        return
+    endif
+
+
+    if(.not.allocated(vec2) )then
+        ret = vec1
+        return
+    endif
+
+    allocate(ret(  size(vec1) + size(vec2) ) )
+    ret(1:size(vec1) ) = vec1(:)
+    ret(size(vec1)+1: ) = vec2(:)
+
+end function
+! ##############################################################
+
+! ##############################################################
+function hstackreal64Vector3(vec1, vec2,vec3) result(ret)
+    real(real64),allocatable,intent(in) :: vec1(:),vec2(:),vec3(:)
+    real(real64),allocatable :: ret(:)
+
+    if(.not.allocated(vec2).and. .not.allocated(vec1) )then
+        if( .not.allocated(vec3) )then
+            return
+        endif
+    endif
+
+    if(.not.allocated(vec1) )then
+        ret =  hstackreal64Vector2(vec2, vec3)
+        return
+    endif
+
+
+    if(.not.allocated(vec2) )then
+        ret =  hstackreal64Vector2(vec1, vec3)
+        return
+    endif
+
+    if(.not.allocated(vec3) )then
+        ret =  hstackreal64Vector2(vec1, vec2)
+        return
+    endif
+
+    allocate(ret(  size(vec1) + size(vec2)+ size(vec3) ) )
+    ret(           1:size(vec1)            ) = vec1(:)
+    ret(size(vec1)+1:size(vec1)+size(vec2) ) = vec2(:)
+    ret(size(vec1)+size(vec2)+1:           ) = vec3(:)
+
+end function
+! ##############################################################
+
+
+! ##############################################################
+function farthestVectorReal64(array,vector) result(ret)
+    real(real64),intent(in) :: array(:,:),vector(:)
+    real(real64),allocatable :: ret(:),trial(:)
+    real(real64) :: dp,dp_tr
+    integer(int32) :: i, n
+
+    n = size(array,2)
+    allocate(ret(n) )
+
+    ret(:) = array(1,:)
+    dp = dot_product(vector-ret,vector-ret )
+    do i=2,size(array,1)
+        dp_tr = dot_product( array(i,:) -vector(:), array(i,:) -vector(:) )
+        if(dp_tr > dp)then
+            ret(:) = array(i,:)
+            dp = dot_product(vector-ret,vector-ret )
+        endif
+    enddo
+
+end function
+! ##############################################################
+
+function rotationMatrixReal64(rotation_angle1, rotation_angle2) result(ret)
+    real(real64),optional,intent(in) :: rotation_angle1,rotation_angle2
+    real(real64),allocatable :: ret(:,:)
+
+    if(present(rotation_angle1) .and. .not. present(rotation_angle2)  )then
+        ! 2D
+        allocate(ret(2,2) )
+        ret(1,1) = cos(rotation_angle1)
+        ret(2,1) = sin(rotation_angle1)
+        ret(1,2) = -sin(rotation_angle1)
+        ret(2,2) = cos(rotation_angle1)
+    elseif(present(rotation_angle1) .and. present(rotation_angle2) )then
+        print *, "Now implementing!"
+        stop
+    endif
+
+end function
+
+
+function averageInt32(vec) result(ret)
+    integer(Int32),intent(in) :: vec(:)
+    integer(Int32) :: ret
+
+    ret = sum(vec)/size(vec)
+end function
+
+function averageReal64(vec) result(ret)
+    real(Real64),intent(in) :: vec(:)
+    real(Real64) :: ret
+
+    ret = sum(vec)/dble(size(vec))
+
+end function
+
+
+! ###############################################################
+function interpolateReal64(x, Fx, x_value) result(ret)
+    real(real64),intent(inout) :: Fx(:), x(:)
+    real(real64),intent(in):: x_value
+    real(real64) :: ret,alpha,x1,x2,Fx1,Fx2
+    integer(int32) :: i,n,id
+    
+    ! express F(x_value) by 
+    ! Linear interpolation by discreted space (x_i, F(x_i) )
+    n = size(x)
+    
+    call heapsort(n,x,Fx)
+    
+    id = SearchNearestValueID(x,x_value)
+    if( x_value > x(id) )then
+        if(id == n)then
+            ret = Fx(n)
+            return
+        else
+            x1 = x(id)
+            x2 = x(id+1)
+            Fx1 = Fx(id)
+            Fx2 = Fx(id+1)
+        endif
+    else
+        if(id == 1)then
+            ret = Fx(1)
+            return
+        else
+            x1 = x(id-1)
+            x2 = x(id)
+            Fx1 = Fx(id-1)
+            Fx2 = Fx(id)
+        endif
+    endif
+    alpha = (x_value - x2)/(x1- x2)
+
+    ret = alpha*Fx1 + (1.0d0 - alpha)*Fx2
+
+end function
+! ###############################################################
 
 end module ArrayClass

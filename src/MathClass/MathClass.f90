@@ -1,15 +1,27 @@
 module MathClass
-	use StringClass
     use, intrinsic :: iso_fortran_env
+	use StringClass
 	implicit none
 	
+
+	integer(int32) :: i_i = 0
+	integer(int32) :: j_j = 0
+	integer(int32) :: k_k = 0
+	!integer(int32) :: i_i = 0
+
+
+
 	type :: Math_
 		real(real64) :: PI = 3.141592653589793d0
 		complex(kind(0d0))	 :: i = (0.0d0, 1.0d0)
 		complex(kind(0d0))	 :: j = (0.0d0, 1.0d0)
 	end type
 	!real(real64) :: pi=3.141592653589793238d0
-	!real(real64) :: e =2.718281828459045235d0
+	!
+
+	interface heapsort
+		module procedure :: heapsortInt32, heapsortReal64
+	end interface
 
 	interface str
 		module procedure fstring_Int, fstring_Real, fstring_complex, fstring_Int_len, fstring_Real_len, fstring_logical, fstring_String
@@ -38,6 +50,8 @@ module MathClass
 	interface array
 		module procedure arrayDim1Real64,arrayDim2Real64,arrayDim3Real64
 	end interface
+
+	
 contains
 ! ###############################################
 recursive function FFT(x) result(hatx)
@@ -196,6 +210,65 @@ end function
 
 
 
+!########################################
+function SearchNearestValueID(Vector,x)  result(id)
+	real(real64),intent(in) :: Vector(:)
+	real(real64),intent(in) :: x
+	integer(int32) :: id,i
+	
+	id = 1
+	do i=1,size(vector)
+		if( abs(vector(id)-x) > abs(vector(i)-x) )then
+			id = i
+			cycle
+		endif
+	enddo
+
+end function
+!########################################
+
+
+!########################################
+function SearchNearestValueIDs(Vector,x,num)  result(id)
+	real(real64),intent(in) :: Vector(:)
+	real(real64),intent(in) :: x
+	integer(int32),intent(in)  :: num
+	integer(int32) :: id(num),i,j
+
+	id(:) = 1		
+	do j=1,num
+		do i=1,size(vector)
+			if(j>=2 )then
+				if(abs(minval(id(1:j-1) - i ))==0) cycle
+			endif
+			if( abs(vector(id(j) )-x) > abs(vector(i)-x) )then
+				id(j) = i
+				cycle
+			endif
+		enddo
+	enddo
+end function
+!########################################
+
+!########################################
+function SearchNearestValue(Vector,x)  result(val)
+	real(real64),intent(in) :: Vector(:)
+	real(real64),intent(in) :: x
+	integer(int32) :: id, i
+	real(real64) :: val
+	
+	id = 1
+	do i=1,size(vector)
+		if( abs(vector(id)-x) > abs(vector(i)-x) )then
+			id = i
+			cycle
+		endif
+	enddo
+
+	val = vector(id)
+end function
+!########################################
+
 
 !########################################
 function SearchNearestCoord(Array,x)  result(id)
@@ -249,13 +322,15 @@ function SearchIDIntVec(Vec,val) result(id_)
 
 end function
 !##################################################
-subroutine heapsort(n,array,val)
+
+!##################################################
+subroutine heapsortReal64(n,array,val)
   	integer(int32),intent(in) :: n
-	real(real64),optional,intent(inout) :: val(1:n)
-  	integer(int32),intent(inout) :: array(1:n)
+  	real(real64),intent(inout) :: array(1:n)! rearrange order by this array
+	real(real64),optional,intent(inout) :: val(1:n) ! linked data
 	real(real64) :: t_real
   	integer(int32) ::i,k,j,l
-  	integer(int32) :: t
+  	real(real64) :: t
   
   	if(n.le.0)then
   		write(6,*)"Error, at heapsort"; stop
@@ -315,7 +390,77 @@ subroutine heapsort(n,array,val)
 		 endif
   	enddo
 
-end subroutine heapsort
+end subroutine heapsortReal64
+
+
+!##################################################
+subroutine heapsortInt32(n,array,val)
+	integer(int32),intent(in) :: n
+	integer(int32),intent(inout) :: array(1:n)! rearrange order by this array
+  real(real64),optional,intent(inout) :: val(1:n) ! linked data
+  real(real64) :: t_real
+	integer(int32) ::i,k,j,l
+	integer(int32) :: t
+
+	if(n.le.0)then
+		write(6,*)"Error, at heapsort"; stop
+	endif
+	if(n.eq.1)return
+
+  l=n/2+1
+  k=n
+  do while(k.ne.1)
+	  if(l.gt.1)then
+		  l=l-1
+		  t=array(L)
+		  if(present(val) )then
+			  t_real=val(L)
+		  endif
+	  else
+		  t=array(k)
+		  if(present(val) )then
+			  t_real=val(k)
+		  endif
+
+		  array(k)=array(1)
+		  if(present(val) )then			
+			  val(k) = val(1)
+		  endif
+
+		  k=k-1
+		  if(k.eq.1) then
+				 array(1)=t
+				 if(present(val) )then
+					  val(1) = t_real
+				 endif
+			  exit
+		  endif
+	  endif
+	  i=l
+	  j=l+l
+	  do while(j.le.k)
+		  if(j.lt.k)then
+				 if(array(j).lt.array(j+1))j=j+1
+
+		  endif
+		  if (t.lt.array(j))then
+			  array(i)=array(j)
+			  if(present(val) )then
+			  val(i)=val(j)
+			  endif
+			  i=j
+			  j=j+j
+		  else
+			  j=k+1
+		  endif
+	  enddo
+	   array(i)=t
+	   if(present(val) )then
+	   val(i)=t_real
+	   endif
+	enddo
+
+end subroutine heapsortInt32
 
 !==========================================================
 !calculate cross product
@@ -865,7 +1010,7 @@ end function
 
 !================================================================================== 
 function sym(a,n) result(ret)
-	real(real64),intent(in) :: a(n,n)
+	real(real64),intent(in) :: a(:,:)
 	real(real64) :: ret(n,n)
 	integer(int32) :: i,n
 
@@ -876,7 +1021,7 @@ end function
 
 !================================================================================== 
 function asym(a,n) result(ret)
-	real(real64),intent(in) :: a(n,n)
+	real(real64),intent(in) :: a(:,:)
 	real(real64) :: ret(n,n)
 	integer(int32) :: i,n
 
@@ -959,6 +1104,11 @@ function fstring_int_len(x,length) result(a)
 	integer(int32),intent(in) :: length
 	character(len=length)	:: a
 
+	if(x/=x  .or. abs(x) >= HUGE(int32) )then
+		a=""
+		return
+	endif
+
 	write(a,*) x
 	a = adjustl(a)
 end function
@@ -971,6 +1121,11 @@ function fstring_real(x) result(a)
 	real(real64),intent(in) :: x
 	character(len=20):: b
 	character(len=:),allocatable	:: a
+
+	if(x/=x .or. abs(x) >= HUGE(real64) )then
+		a=""
+		return
+	endif
 
 	write(b,'(f0.8)') x
 	a = trim(adjustl(b))
@@ -986,6 +1141,11 @@ function fstring_complex(x) result(a)
 	character(len=30):: b
 	character(len=:),allocatable	:: a
 
+	if(x/=x  .or. abs(x) >= HUGE(real64) )then
+		a=""
+		return
+	endif
+
 	write(b,fmt = '(F0.0,SP,F0.0,"i")') x
 	a = trim(adjustl(b))
 end function
@@ -999,6 +1159,10 @@ function fstring_real_len(x,length) result(a)
 	character(len=60)	:: a
 	character*40						:: form
 
+	if(x/=x .or. abs(x) >= HUGE(real64))then
+		a=""
+		return
+	endif
 	
 	write(a,'(f0.10)') x
 	a = adjustl(a)
@@ -1012,10 +1176,53 @@ function fint(ch)	result(a)
 	character(*),intent(in)			:: ch
 	integer(int32)				:: a
 
-	read(ch,*) a
+	read(ch,*,err=1000) a
+	return
+1000 a = 0
 
 end function
 !================================================================================== 
+
+!================================================================================== 
+function fint16(ch)	result(a)
+	character(*),intent(in)			:: ch
+	integer(int16)				:: a
+
+		read(ch,*,err=1001) a
+	return
+1001 a = 0
+
+end function
+!================================================================================== 
+
+
+
+!================================================================================== 
+function fint32(ch)	result(a)
+	character(*),intent(in)			:: ch
+	integer(int32)				:: a
+
+		read(ch,*,err=1002) a
+	return
+1002 a = 0
+
+end function
+!================================================================================== 
+
+
+!================================================================================== 
+function fint64(ch)	result(a)
+	character(*),intent(in)			:: ch
+	integer(int64)				:: a
+
+		read(ch,*,err=1003) a
+	return
+1003 a = 0
+
+end function
+!================================================================================== 
+
+
 
 
 !================================================================================== 
@@ -1023,10 +1230,53 @@ function freal(ch)	result(a)
 	character(*),intent(in)			:: ch
 	real(real64)				:: a
 
-	read(ch,*) a
+		read(ch,*,err=1004) a
+	return
+1004 a = 0
 
 end function
 !================================================================================== 
+
+
+!================================================================================== 
+function freal32(ch)	result(a)
+	character(*),intent(in)			:: ch
+	real(real32)				:: a
+
+		read(ch,*,err=1005) a
+	return
+1005 a = 0
+
+end function
+!================================================================================== 
+
+
+!================================================================================== 
+function freal64(ch)	result(a)
+	character(*),intent(in)			:: ch
+	real(real64)				:: a
+
+		read(ch,*,err=1006) a
+	return
+1006 a = 0
+
+end function
+!================================================================================== 
+
+
+!================================================================================== 
+function freal128(ch)	result(a)
+	character(*),intent(in)			:: ch
+	real(real128)				:: a
+
+		read(ch,*,err=1007) a
+	return
+1007 a = 0
+
+end function
+!================================================================================== 
+
+
 
 
 
@@ -1501,6 +1751,150 @@ end function
 ! ########################################################
 
 
+! ########################################################
+function convertStringToInteger(message) result(ret)
+	character(*),intent(in):: message
+	character(1) :: x
+	character(2*len(message) ) :: ret
+	integer(int32) :: i
+	ret = ""
+	!allocate(ret(len(message)*2 ) )
+	do i=1,len(message)
+		x =  message(i:i)
+		select case(x)
+			case(" ")
+				cycle
+			case("a","A")
+				ret(2*i-1:2*i) =  "01"
+			case("b","B")
+				ret(2*i-1:2*i) =  "02"
+			case("c","C")
+				ret(2*i-1:2*i) =  "03"
+			case("d","D")
+				ret(2*i-1:2*i) =  "04"
+			case("e","E")
+				ret(2*i-1:2*i) =  "05"
+			case("f","F")
+				ret(2*i-1:2*i) =  "06"
+			case("g","G")
+				ret(2*i-1:2*i) =  "07"
+			case("h","H")
+				ret(2*i-1:2*i) =  "08"
+			case("i","I")
+				ret(2*i-1:2*i) =  "09"
+			case("j","J")
+				ret(2*i-1:2*i) =  "10"
+			case("k","K")
+				ret(2*i-1:2*i) =  "11"
+			case("l","L")
+				ret(2*i-1:2*i) =  "12"
+			case("m","M")
+				ret(2*i-1:2*i) =  "13"
+			case("n","N")
+				ret(2*i-1:2*i) =  "14"
+			case("o","O")
+				ret(2*i-1:2*i) =  "15"
+			case("p","P")
+				ret(2*i-1:2*i) =  "16"
+			case("q","Q")
+				ret(2*i-1:2*i) =  "17"
+			case("r","R")
+				ret(2*i-1:2*i) =  "18"
+			case("s","S")
+				ret(2*i-1:2*i) =  "19"
+			case("t","T")
+				ret(2*i-1:2*i) =  "20"
+			case("u","U")
+				ret(2*i-1:2*i) =  "21"
+			case("v","V")
+				ret(2*i-1:2*i) =  "22"
+			case("w","W")
+				ret(2*i-1:2*i) =  "23"
+			case("x","X")
+				ret(2*i-1:2*i) =  "24"
+			case("y","Y")
+				ret(2*i-1:2*i) =  "25"
+			case("z","Z")
+				ret(2*i-1:2*i) =  "26"
+		end select
+	enddo
+
+end function
+! ########################################################
+
+
+! ########################################################
+function convertIntegerToString(message) result(ret)
+	character(*),intent(in):: message
+	character(2) :: x
+	character(len(message) ) :: ret
+	integer(int32) :: i
+	ret = ""
+	!allocate(ret(len(message)*2 ) )
+	do i=1,len(message)
+		x(1:2) =  message(2*i-1:2*i)
+		select case(x)
+			case("99")
+				cycle
+			case(" ")
+				cycle
+			case("01")
+				ret(i:i) =  "a"
+			case("02")
+				ret(i:i) =  "b"
+			case("03")
+				ret(i:i) =  "c"
+			case("04")
+				ret(i:i) =  "d"
+			case("05")
+				ret(i:i) =  "e"
+			case("06")
+				ret(i:i) =  "f"
+			case("07")
+				ret(i:i) =  "g"
+			case("08")
+				ret(i:i) =  "h"
+			case("09")
+				ret(i:i) =  "i"
+			case("10")
+				ret(i:i) =  "j"
+			case("11")
+				ret(i:i) =  "k"
+			case("12")
+				ret(i:i) =  "l"
+			case("13")
+				ret(i:i) =  "m"
+			case("14")
+				ret(i:i) =  "n"
+			case("15")
+				ret(i:i) =  "o"
+			case("16")
+				ret(i:i) =  "p"
+			case("17")
+				ret(i:i) =  "q"
+			case("18")
+				ret(i:i) =  "r"
+			case("19")
+				ret(i:i) =  "s"
+			case("20")
+				ret(i:i) =  "t"
+			case("21")
+				ret(i:i) =  "u"
+			case("22")
+				ret(i:i) =  "v"
+			case("23")
+				ret(i:i) =  "w"
+			case("24")
+				ret(i:i) =  "x"
+			case("25")
+				ret(i:i) =  "y"
+			case("26")
+				ret(i:i) =  "z"
+		end select
+	enddo
+
+end function
+! ########################################################
 ! ########################################################
 subroutine rsa_keygen(prime1,prime2,seed,id_rsa,id_rsa_pub)
 	integer(int32),intent(in) :: prime1,prime2,seed

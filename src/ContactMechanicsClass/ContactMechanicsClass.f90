@@ -1,7 +1,7 @@
 module ContactMechanicsClass
     use, intrinsic :: iso_fortran_env
 	use MathClass
-	use MPIClass
+!	use MPIClass
     use FEMIfaceClass
 	use FEMDomainClass
 	use FiniteDeformationClass
@@ -15,7 +15,17 @@ module ContactMechanicsClass
 		integer(int32),allocatable :: contactlist(:,:)
 		real(real64),allocatable :: YoungModulus(:)
 		real(real64),allocatable :: PoissonRatio(:)
+		real(real64),allocatable :: Density(:)
+
+		real(real64),allocatable :: YoungModulusList(:,:)
+		real(real64),allocatable :: PoissonRatioList(:,:)
+		real(real64),allocatable :: DensityList(:,:)
+
 		logical :: initialized = .false.
+
+		real(real64) :: gravity(1:3) =[0.0d0, 0.0d0, -9.810d0]
+		
+		real(real64) :: penalty = 100000.0d0
 
 		! >>>>>>>>>>>> Regacy >>>>>>>>>>>>>>>>>
 		! >>>>>>>>>>>> Regacy >>>>>>>>>>>>>>>>>
@@ -109,6 +119,14 @@ module ContactMechanicsClass
 		procedure :: run 			=> runCM
 		procedure :: updateMesh     => updateMeshContactMechanics
 		procedure :: fix     		=> fixContactMechanics
+		procedure :: setDensity     => setDensity
+		procedure :: setYoungModulus     => setYoungModulus
+		procedure :: setPoissonRatio     => setPoissonRatio
+		procedure :: properties => propertiesCM
+		procedure :: property => propertiesCM
+		procedure :: showProperty   => showPropertyCM
+
+
 	
 		! regacy
 		procedure :: Update			=> UpdateContactConfiguration
@@ -127,8 +145,6 @@ module ContactMechanicsClass
 		procedure :: getDispBound => getDispBoundCM
 		procedure :: getTracBound => getTracBoundCM
 
-		procedure :: properties => propertiesCM
-		procedure :: property => propertiesCM
 
 		! >>> regacy subroutines for lodging-simulator 2.5
 		procedure :: ls_add_du => ls_add_duCM
@@ -143,15 +159,21 @@ contains
 
 
 ! #####################################################
-subroutine InitializeContactMechanics(obj, femdomains, femdomainsp, contactlist,femdomain1, femdomain2)
+subroutine InitializeContactMechanics(obj, femdomains, femdomainsp, contactlist,femdomain1, femdomain2,&
+	AllYoungModulus,AllPoissonRatio,AllDensity)
 	class(ContactMechanics_),intent(inout)  :: obj
 	type(FEMDomain_),target,optional,intent(in) :: femdomains(:)
 	type(FEMDomainp_),target,optional,intent(in) :: femdomainsp(:)
 	type(FEMDomain_),target,optional,intent(in) :: femdomain1, femdomain2
 	integer(int32),optional,intent(in) :: ContactList(:,:)
 
-	real(real64),parameter :: DefaultYoungModulus=1000.0d0
-	real(real64),parameter :: DefaultPoissonRatio=0.30d0
+	real(real64) :: DefaultYoungModulus=1000.0d0
+	real(real64) :: DefaultPoissonRatio=0.30d0
+	real(real64) :: DefaultDensity=0.0d0
+	
+	real(real64),optional,intent(in) :: AllYoungModulus
+	real(real64),optional,intent(in) :: AllPoissonRatio
+	real(real64),optional,intent(in) :: AllDensity
 
 	integer(int32) :: node_num_1
 	integer(int32) :: node_num_2
@@ -161,6 +183,18 @@ subroutine InitializeContactMechanics(obj, femdomains, femdomainsp, contactlist,
 
 	! modern
 
+	if(present(AllYoungModulus) )then
+		DefaultYoungModulus = AllYoungModulus 
+	endif
+
+	if(present(AllPoissonRatio) )then
+		DefaultPoissonRatio = AllPoissonRatio 
+	endif
+	
+	if(present(AllDensity) )then
+		DefaultDensity = AllDensity 
+	endif
+	
 	if(present(femdomains) .and. present(contactList) )then
 		numDomain = size(femdomains)
 		if(numDomain==0)then
@@ -176,8 +210,10 @@ subroutine InitializeContactMechanics(obj, femdomains, femdomainsp, contactlist,
 		allocate(obj%femdomains(numDomain) )
 		allocate(obj%YoungModulus(numDomain) )
 		allocate(obj%PoissonRatio(numDomain) )
+		allocate(obj%Density(numDomain) )
 		obj%YoungModulus(:) = DefaultYoungModulus
 		obj%PoissonRatio(:) = DefaultPoissonRatio
+		obj%Density(:) = DefaultDensity
 		
 
 
@@ -213,8 +249,10 @@ subroutine InitializeContactMechanics(obj, femdomains, femdomainsp, contactlist,
 		allocate(obj%femdomains(numDomain) )
 		allocate(obj%YoungModulus(numDomain) )
 		allocate(obj%PoissonRatio(numDomain) )
+		allocate(obj%Density(numDomain) )
 		obj%YoungModulus(:) = DefaultYoungModulus
 		obj%PoissonRatio(:) = DefaultPoissonRatio
+		obj%Density(:) = DefaultDensity
 		
 
 
@@ -393,6 +431,7 @@ subroutine fixContactMechanics(obj,direction,disp,DomainID,x_min,x_max,y_min,y_m
 
 
 	print *, "fixContactMechanics >> [2] setting fix boundary, size:: ",size(FixBoundary)
+
 	do i=1,size(FixBoundary)
 		call obj%solver%fix(nodeid=FixBoundary(i), &
 			EntryID=EntryID, &
@@ -424,13 +463,16 @@ end subroutine
 
 ! #####################################################
 
-subroutine runCM(obj,penaltyparameter,debug)
+
+! #####################################################
+subroutine runCM(obj,penaltyparameter,debug,GaussPointProjection)
 	class(ContactMechanics_),target,intent(inout) :: obj
 	real(real64),optional,intent(in) :: penaltyparameter
 
 	logical,optional,intent(in) :: debug
 	logical :: Debugflag=.false.
-	integer(int32) :: i,nod_max,nn,itr,fstep,j,k,l,o
+	logical,optional,intent(in) :: GaussPointProjection
+	integer(int32) :: i,nod_max,nn,itr,fstep,j,k,l,o,GaussPointID
 	integer(int32) :: node_num_1,node_num_2,converge_check,error
 	type(IO_) :: ErrorLog
 	real(real64) :: rvec0,u_norm,er,er0,reacforcex,reacforcey
@@ -439,9 +481,22 @@ subroutine runCM(obj,penaltyparameter,debug)
 	integer(int32),allocatable :: DomainIDs1(:),DomainIDs12(:),InterConnect(:)
 
 	real(real64),allocatable :: A_ij(:,:), x_i(:), b_i(:) ! A x = b
-	real(real64) :: position(3)
+	real(real64),allocatable :: A_ij_GPP(:,:)
+	real(real64) :: position(3),center(3)
 	real(real64) :: penalty
 	type(FEMDomain_),pointer :: domain1, domain2
+	type(ShapeFunction_) :: sf
+	logical :: GPP ! enable Gauss-Point projection
+	if(present(GaussPointProjection) )then
+		if(GaussPointProjection)then
+			GPP=.true.
+		endif
+	endif
+
+
+	if(present(debug) )then
+		obj%solver%debug = debug
+	endif
 
 	if( obj%initialized  )then
 		
@@ -459,7 +514,8 @@ subroutine runCM(obj,penaltyparameter,debug)
 			DomainIDs1(:) = DomainID
 			
 			do ElementID=1, obj%femdomains(DomainID)%femdomainp%ne()
-			    ! For 1st element, create stiffness matrix
+				
+				! For 1st element, create stiffness matrix
 			    A_ij = obj%femdomains(DomainID)%femdomainp%StiffnessMatrix(&
 					ElementID=ElementID,&
 					E=obj%YoungModulus(DomainID), &
@@ -467,8 +523,8 @@ subroutine runCM(obj,penaltyparameter,debug)
 			    b_i  = obj%femdomains(DomainID)%femdomainp%MassVector(&
 			        ElementID=ElementID,&
 			        DOF=obj%femdomains(DomainID)%femdomainp%nd() ,&
-			        Density=0.30d0,&
-			        Accel=(/0.0d0, 0.0d0, 0.0d0/)&
+			        Density=obj%Density(DomainID),&
+			        Accel=obj%Gravity&
 			        )
 			    ! assemble them 
 			    call obj%solver%assemble(&
@@ -485,7 +541,7 @@ subroutine runCM(obj,penaltyparameter,debug)
 		enddo
 
 		InterfaceID = 0
-		penalty = input(default=10000.0d0,option=penaltyparameter)
+		penalty = input(default=obj%penalty,option=penaltyparameter)
 		do i=1, size(obj%ContactList,1)
 			do j=1, size(obj%ContactList,2)
 				if(obj%contactList(i,j)>=1 )then
@@ -518,29 +574,68 @@ subroutine runCM(obj,penaltyparameter,debug)
 					DomainIDs12(1) = i
 					DomainIDs12(2:) = j
 
-					do NodeID=1, domain2%nn()
-					    ! For 1st element, create stiffness matrix
-					    ! set global coordinate
-						position(:) = domain1%mesh%nodcoord(NodeID,:)
-					    InterConnect(1) = NodeID
-					    if( domain2%mesh%nearestElementID(x=position(1),y=position(2),z=position(3))<=0 )then
-					        cycle
-					    endif
-					    InterConnect(2:) = domain2%connectivity(domain2%mesh%nearestElementID(x=position(1),y=position(2),z=position(3) ))
-					    A_ij = penalty*domain2%connectMatrix(position,DOF=domain2%nd() ) 
-					    ! assemble them 
-					    call obj%solver%assemble(&
-					        connectivity=InterConnect,&
-					        DOF=domain2%nd() ,&
-					        eMatrix=A_ij,&
-					        DomainIDs=DomainIDs12)    
-					enddo
 
+					if(GPP)then
+						! compute constrait matrix 
+						! by Gauss-Point Projection
+						InterConnect = int( zeros(domain1%nne()+ domain2%nne()) )
+						
+						DomainIDs12 = int( zeros(domain1%nne()+ domain2%nne()) ) 
+						DomainIDs12(1:domain1%nne() ) = i
+						DomainIDs12(domain1%nne()+1: ) = j
+
+						do ElementID=1, domain1%ne()
+							do GaussPointID = 1, domain1%ngp()
+			
+								! For 1st element, create stiffness matrix
+						    	! set global coordinate
+
+								position(:) = domain1%GlobalPositionOfGaussPoint(ElementID,GaussPointID)
+								
+						    	
+						    	if( domain2%mesh%nearestElementID(x=position(1),y=position(2),z=position(3))<=0 )then
+						    	    cycle
+						    	endif
+								
+								InterConnect(1:domain1%nne() ) = domain1%connectivity(ElementID) 
+						    	InterConnect(domain1%nne()+1:) &
+									= domain2%connectivity(domain2%mesh%nearestElementID(x=position(1),y=position(2),z=position(3) ))
+									
+								sf = domain1%mesh%getShapeFunction(ElementID,GaussPointID)
+								A_ij = penalty*domain2%connectMatrix(position,DOF=domain2%nd(),shapefunction=sf ) 
+						    	
+								! assemble them 
+						    	call obj%solver%assemble(&
+						    	    connectivity=InterConnect,&
+						    	    DOF=domain2%nd() ,&
+						    	    eMatrix=A_ij,&
+						    	    DomainIDs=DomainIDs12)    
+							enddo
+						enddo
+					else
+						do NodeID=1, domain1%nn()
+						    ! For 1st element, create stiffness matrix
+						    ! set global coordinate
+							position(:) = domain1%mesh%nodcoord(NodeID,:)
+						    if( domain2%mesh%nearestElementID(x=position(1),y=position(2),z=position(3))<=0 )then
+						        cycle
+						    endif
+							InterConnect(1) = NodeID
+						    InterConnect(2:) = domain2%connectivity(domain2%mesh%nearestElementID(x=position(1),y=position(2),z=position(3) ))
+						    A_ij = penalty*domain2%connectMatrix(position,DOF=domain2%nd() ) 
+						    ! assemble them 
+						    call obj%solver%assemble(&
+						        connectivity=InterConnect,&
+						        DOF=domain2%nd() ,&
+						        eMatrix=A_ij,&
+						        DomainIDs=DomainIDs12)    
+						enddo
+					endif
 				endif
 			enddo
 		enddo
 
-		call obj%solver%prepareFix(debug=.true.)
+		call obj%solver%prepareFix()
 
 		return
 
@@ -1048,14 +1143,21 @@ subroutine runCM(obj,penaltyparameter,debug)
 end subroutine
 
 ! #####################################################
-subroutine propertiesCM(obj,config)
+subroutine propertiesCM(obj,config,penalty,gravity)
 	class(ContactMechanics_),intent(inout) :: obj
 	character(*),optional,intent(in) :: config
+	real(real64),optional,intent(in) :: penalty,gravity(3)
 	type(IO_) :: f
 	character(200) :: fn,conf,line
 	integer(int32) :: blcount,rmc,id
 
+	if(present(penalty) )then
+		obj%penalty = penalty
+	endif
 
+	if(present(gravity) )then
+		obj%gravity = gravity
+	endif
 
 	if(.not.present(config).or. index(config,".json")==0 )then
 		
@@ -1190,7 +1292,7 @@ end subroutine
 subroutine UpdateContactConfiguration(obj,WeakCoupling,StrongCoupling)
 	class(ContactMechanics_),intent(inout)::obj
 	logical,optional,intent(in) :: WeakCoupling,StrongCoupling
-	type(MPI_)::mpidata
+	!type(MPI_)::mpidata
 
 
 
@@ -1214,7 +1316,7 @@ subroutine UpdateContactConfiguration(obj,WeakCoupling,StrongCoupling)
 			call obj%FEMDomain2%export(OptionalProjectName="2ontact_2_",FileHandle=121,SolverType="FiniteDeform_",MeshDimension=3)
 			
 			
-			call mpidata%end()
+			!call mpidata%end()
 			stop "debug update contact"
 			! debug :: Contact-Traction conversion has errors
 
@@ -1267,7 +1369,6 @@ end subroutine
 subroutine deployContactMechanics(obj,IfaceObj)
 	class(ContactMechanics_),intent(inout)::obj
 	class(FEMIface_),target,intent(in)::IfaceObj
-	type(MPI_)::mpidata
 
 	obj%FEMIface => IfaceObj
 
@@ -1307,7 +1408,7 @@ end subroutine
 ! #####################################################
 subroutine GetActiveNTS(obj)
     class(ContactMechanics_),intent(inout)::obj
-	type(MPI_)::mpidata
+	!type(MPI_)::mpidata
     real(real64) :: gap
     real(real64),allocatable :: xs(:),xm(:,:)
 	integer i,j,n,dim_num,mnod_num
@@ -5176,7 +5277,7 @@ end subroutine
 ! #########################################
 subroutine updateContactStressCM(obj)
 	class(ContactMechanics_),intent(inout)::obj
-	type(MPI_)::mpidata
+	!type(MPI_)::mpidata
 	
 	
 
@@ -5221,7 +5322,7 @@ subroutine getGapCM(obj)
 	real(real64),allocatable :: xm5(:),xm6(:),xm7(:),xm8(:),mid(:)
 	real(real64) :: val
 	integer :: i,j,k,n,NumOfNTSelem,dim_num
-	type(MPI_)::mpidata
+	!type(MPI_)::mpidata
 
 	if(.not. allocated(obj%FEMIface%NTS_ElemNod) )then
 		print *, "Error :: ContactMechanics_ >> updateContactStressCM >> not (.not. allocated(obj%NTS_ElemNod) )"
@@ -5525,7 +5626,7 @@ end subroutine
 ! #########################################
 subroutine exportForceAsTractionCM(obj)
 	class(ContactMechanics_),intent(inout)::obj
-	type(mpi_)::mpidata
+	!type(mpi_)::mpidata
 	integer :: nodeid,i,j,k
 	real(real64) :: bcval
 
@@ -5589,7 +5690,7 @@ subroutine exportForceAsTractionCM(obj)
 	
 	call obj%FEMIface%GmshPlotMesh(Name="debugNTS",withNeumannBC=.true.,withDirichletBC=.true.)
 
-	!call mpidata%end()
+	!!call mpidata%end()
 	!stop "debug"	
 end subroutine
 ! #########################################
@@ -5911,5 +6012,56 @@ end subroutine
 
 
 end subroutine displace
+
+subroutine showPropertyCM(obj)
+	class(ContactMechanics_),intent(in) :: Obj
+	integer(int32) :: i
+
+	if(allocated(obj%YoungModulus) )then
+		do i=1,size(obj%femdomains)
+			print *, "Domain-ID ::",i,"YoungModulus ::",obj%YoungModulus(i),"PoissonRatio",obj%PoissonRatio(i),"Density",obj%Density(i)
+		enddo
+	endif
+
+end subroutine
+
+subroutine setYoungModulus(obj,YoungModulus,DomainID)
+	class(ContactMechanics_),intent(inout) :: Obj
+	real(real64),intent(in) :: YoungModulus
+	integer(int32),optional,intent(in) :: DomainID
+
+	if(present(DomainID) )then
+		obj%YoungModulus(DomainID) = YoungModulus
+	else
+		obj%YoungModulus(:) = YoungModulus
+	endif
+
+end subroutine
+
+subroutine setPoissonRatio(obj,PoissonRatio,DomainID)
+	class(ContactMechanics_),intent(inout) :: Obj
+	real(real64),intent(in) :: PoissonRatio
+	integer(int32),optional,intent(in) :: DomainID
+
+	if(present(DomainID) )then
+		obj%PoissonRatio(DomainID) = PoissonRatio
+	else
+		obj%PoissonRatio(:) = PoissonRatio
+	endif
+
+end subroutine
+
+subroutine setDensity(obj,density,DomainID)
+	class(ContactMechanics_),intent(inout) :: Obj
+	real(real64),intent(in) :: density
+	integer(int32),optional,intent(in) :: DomainID
+
+	if(present(DomainID) )then
+		obj%density(DomainID) = density
+	else
+		obj%density(:) = density
+	endif
+
+end subroutine
 
 end module 

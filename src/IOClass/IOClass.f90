@@ -4,28 +4,63 @@ module IOClass
     use StringClass
     implicit none
 
+    integer(int32),parameter :: PF_JSON=1
+    integer(int32),parameter :: PF_CSV=2
+
     type :: IO_
         integer :: fh=100
         logical :: active=.false.
         logical :: EOF=.true.
         character(1) :: state
         character(200)::path,name,extention
+        character(:),allocatable:: title
+        character(:),allocatable:: xlabel,ylabel,zlabel
+        character(:),allocatable :: filename
     contains
         procedure,public :: unit => unitIO
 
         procedure,public :: numLine => numLineIO
 
+        procedure,public :: flush => flushIO
+
         procedure,pass   :: openIOchar
         procedure,pass   :: openIOstring
-        
+
+        procedure, pass :: parseIOChar200
+        procedure, pass :: parseIO2keysChar200
+        generic,public :: parse =>parseIOChar200,parseIO2keysChar200
+
         generic,public :: open => openIOchar, openIOstring
         !procedure,public :: open => openIO
-        procedure,pass :: writeIOchar
-        procedure,pass :: writeIOstring
+        procedure,pass :: writeIOchar,writeIOcharchar,writeIOcharcharchar
+        procedure,pass :: writeIOstring,writeIOstringstring,writeIOstringstringstring
+
+        ! int-char-int
+        procedure,pass :: writeIOint32re64
+
+        procedure,pass :: writeIOint32re64vector
+        procedure,pass :: writeIOint32int32vector
+
         procedure,pass :: writeIOint32
+        procedure,pass :: writeIOint32int32
+        procedure,pass :: writeIOint32int32int32
+        procedure,pass :: writeIOint32int32int32int32
+        procedure,pass :: writeIOint32int32int32int32int32
+        procedure,pass :: writeIOint32int32int32int32int32int32
+
+
+        
         procedure,pass :: writeIOint32Vector
         procedure,pass :: writeIOint32Array
+
         procedure,pass :: writeIOre64
+        procedure,pass :: writeIOre64re64
+        procedure,pass :: writeIOre64re64re64
+        procedure,pass :: writeIOre64re64re64re64
+        procedure,pass :: writeIOre64re64re64re64re64
+        procedure,pass :: writeIOre64re64re64re64re64re64
+
+        
         procedure,pass :: writeIOre64Vector
         procedure,pass :: writeIOre64Array
         procedure,pass :: writeIOcomplex64
@@ -33,6 +68,14 @@ module IOClass
         procedure,pass :: writeIOcomplex64Array
         generic,public :: write => writeIOchar,writeIOstring,writeIOre64,writeIOre64Vector,writeIOre64Array,&
             writeIOint32,writeIOint32Vector,writeIOint32Array,&
+            writeIOre64re64,writeIOre64re64re64,writeIOre64re64re64re64,&
+            writeIOre64re64re64re64re64,writeIOre64re64re64re64re64re64,&
+            writeIOint32int32,writeIOint32int32int32,writeIOint32int32int32int32,&
+            writeIOint32int32int32int32int32,writeIOint32int32int32int32int32int32,&
+            writeIOstringstring,writeIOstringstringstring,&
+            writeIOcharchar,writeIOcharcharchar,&
+            writeIOint32re64vector,writeIOint32int32vector,&
+            writeIOint32re64,&
             writeIOcomplex64,writeIOcomplex64Vector,writeIOcomplex64Array
         !procedure,public :: write => writeIO
         procedure,pass :: readIOchar
@@ -45,17 +88,21 @@ module IOClass
         generic,public :: read => readIOchar,readIOInt,readIOIntVector,readIOIntArray&
             ,readIOReal64,readIOReal64Vector,readIOReal64Array
 
+        procedure,public :: plot => plotIO
+        procedure,public :: splot => splotIO
+
+
         procedure,public :: readline => readlineIO
         procedure,public :: close => closeIO    
     end type
 
     
     interface print
-        module procedure printChar,printString, printReal64, printReal32, printInt64, printInt32
+        module procedure printChar, printReal64, printReal32, printInt64, printInt32
     end interface print
 
     interface disp
-        module procedure printChar,printString, printReal64, printReal32, printInt64, printInt32
+        module procedure printChar, printReal64, printReal32, printInt64, printInt32
     end interface disp
 
     interface plot
@@ -269,45 +316,55 @@ subroutine openIOchar(obj,path,state,name,extention,fh)
                 if(present(state) )then
                     if(state=="r")then
                         open(newunit=obj%fh,file=trim(path)//trim(name)//trim(extention),status='old')
+                        obj%filename=trim(path)//trim(name)//trim(extention)
                     elseif(state=="w")then
                         open(newunit=obj%fh,file=trim(path)//trim(name)//trim(extention),status='replace')
+                        obj%filename = trim(path)//trim(name)//trim(extention)
                     else
                         call print("Error :: IOClass % open >> argument <state> should be w or r ")
                         stop
                     endif
                 else
                     open(newunit=obj%fh,file=trim(path)//trim(name)//trim(extention) )
+                    obj%filename = trim(path)//trim(name)//trim(extention)
                 endif
             else
                 if(present(state) )then
                     if(state=="r")then
                         open(newunit=obj%fh,file=trim(path)//trim(name),status='old' )
+                        obj%filename = trim(path)//trim(name)
                     elseif(state=="w")then
                         open(newunit=obj%fh,file=trim(path)//trim(name),status='replace' )
+                        obj%filename=trim(path)//trim(name)
                     else
                         call print("Error :: IOClass % open >> argument <state> should be w or r ")
                         stop
                     endif
                 else
                     open(newunit=obj%fh,file=trim(path)//trim(name) )
+                    obj%filename = trim(path)//trim(name)
                 endif
             endif
         else
             if(present(state) )then
                 if(state=="r")then
                     open(newunit=obj%fh,file=trim(path),status='old' )
+                    obj%filename = trim(path)
                 elseif(state=="w")then
                     open(newunit=obj%fh,file=trim(path),status='replace' )
+                    obj%filename = trim(path)
                 else
                     call print("Error :: IOClass % open >> argument <state> should be w or r ")
                     stop
                 endif
             else
                 open(newunit=obj%fh,file=trim(path) )
+                obj%filename = trim(path)
             endif
         endif
     else
         open(newunit=obj%fh,file="./untitled.txt",status="replace" )
+        obj%filename = "./untitled.txt"
     endif
     
     obj%EOF = .false.
@@ -396,8 +453,10 @@ subroutine openIOstring(obj,path_s,state,name_s,extention_s,fh)
     if(present(state) )then
         if(state == "w")then
             open(newunit=obj%fh,file=trim(path_s%str()),status="replace" )
+            obj%filename = trim(path_s%str())
         elseif(state == "r")then
             open(newunit=obj%fh,file=trim(path_s%str()),status="old" )
+            obj%filename = trim(path_s%str())
         else
             call print("Error :: IOClass % open >> argument <state> should be w or r ")
         endif
@@ -409,11 +468,14 @@ subroutine openIOstring(obj,path_s,state,name_s,extention_s,fh)
         if(present(extention_s) )then
             obj%extention=trim(extention_s%str())
             open(newunit=obj%fh,file=trim(path_s%str())//trim(name_s%str())//trim(extention_s%str()) )
+            obj%filename = trim(path_s%str())//trim(name_s%str())//trim(extention_s%str())
         else
             open(newunit=obj%fh,file=trim(path_s%str())//trim(name_s%str()) )
+            obj%filename = trim(path_s%str())//trim(name_s%str()) 
         endif
     else
         open(newunit=obj%fh,file=trim(path_s%str()) )
+        obj%filename = trim(path_s%str())
     endif
     
     obj%EOF = .false.
@@ -440,6 +502,41 @@ end subroutine writeIOchar
 ! #############################################
 
 
+! #############################################
+subroutine writeIOcharchar(obj,char1,char2)
+    class(IO_),intent(inout) :: obj
+    character(*),intent(in) :: char1,char2
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') char1//" "//char2
+
+end subroutine writeIOcharchar
+! #############################################
+
+
+! #############################################
+subroutine writeIOcharcharchar(obj,char1,char2,char3)
+    class(IO_),intent(inout) :: obj
+    character(*),intent(in) :: char1,char2,char3
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') char1//" "//char2//" "//char3
+
+end subroutine writeIOcharcharchar
+! #############################################
+
+
+
 
 ! #############################################
 subroutine writeIOint32(obj,in32)
@@ -456,6 +553,124 @@ subroutine writeIOint32(obj,in32)
 
 end subroutine writeIOint32
 ! #############################################
+
+! #############################################
+subroutine writeIOint32re64(obj,in32,re64)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32
+    real(real64),intent(in) :: re64
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(in32))//" "//trim(str(re64))
+
+end subroutine writeIOint32re64
+! #############################################
+
+! #############################################
+
+
+subroutine writeIOint32int32(obj,in32_1,in32_2)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32_1,in32_2
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(in32_1))//" "//trim(str(in32_2))
+
+end subroutine 
+
+! ####################################################
+
+! #############################################
+
+
+subroutine writeIOint32int32int32(obj,in32_1,in32_2,in32_3)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32_1,in32_2,in32_3
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(in32_1))//" "//trim(str(in32_2))//" "//trim(str(in32_3))
+
+end subroutine 
+
+! ####################################################
+
+! #############################################
+
+
+subroutine writeIOint32int32int32int32(obj,in32_1,in32_2,in32_3,in32_4)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32_1,in32_2,in32_3,in32_4
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(in32_1))//" "//trim(str(in32_2))//" "//trim(str(in32_3))//" "//trim(str(in32_4))
+
+end subroutine 
+
+! ####################################################
+
+
+! #############################################
+
+
+subroutine writeIOint32int32int32int32int32(obj,in32_1,in32_2,in32_3,in32_4,in32_5)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32_1,in32_2,in32_3,in32_4,in32_5
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(in32_1))//" "//trim(str(in32_2))//" "&
+        //trim(str(in32_3))//" "//trim(str(in32_4))//" "//trim(str(in32_5))
+
+end subroutine 
+
+! ####################################################
+
+
+! #############################################
+
+
+subroutine writeIOint32int32int32int32int32int32(obj,in32_1,in32_2,in32_3,in32_4,in32_5,in32_6)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32_1,in32_2,in32_3,in32_4,in32_5,in32_6
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(in32_1))//" "//trim(str(in32_2))//" "&
+        //trim(str(in32_3))//" "//trim(str(in32_4))//" "//trim(str(in32_5))&
+        //" "//trim(str(in32_6))
+
+end subroutine 
+
+! ####################################################
+
 
 
 ! #############################################
@@ -475,6 +690,48 @@ subroutine writeIOint32Vector(obj,in32)
 end subroutine
 ! #############################################
 
+
+! #############################################
+subroutine writeIOint32int32vector(obj,in32_1,in32)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32_1,in32(:)
+    integer(int32) :: i
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+
+    write(obj%fh, '(A)',advance="no") trim(str(in32_1))
+    do i=1,size(in32)
+        write(obj%fh, '(A)',advance="no") " "//trim(str(in32(i) ))
+    enddo
+    write(obj%fh, '(A)',advance="yes") " "
+end subroutine
+! #############################################
+
+
+! #############################################
+subroutine writeIOint32re64Vector(obj,in32_1,re64)
+    class(IO_),intent(inout) :: obj
+    integer(int32),intent(in) :: in32_1
+    real(real64),intent(in) :: re64(:)
+    integer(int32) :: i
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+
+    write(obj%fh, '(A)',advance="no") trim(str(in32_1))
+    do i=1,size(re64)
+        write(obj%fh, '(A)',advance="no") " "//trim(str(re64(i) ))
+    enddo
+    write(obj%fh, '(A)',advance="yes") " "
+end subroutine
+! #############################################
 
 ! #############################################
 subroutine writeIOint32Array(obj,in32)
@@ -508,6 +765,111 @@ subroutine writeIOre64(obj,re64)
 
 end subroutine writeIOre64
 ! #############################################
+
+
+
+subroutine writeIOre64re64(obj,re64_1,re64_2)
+    class(IO_),intent(inout) :: obj
+    real(real64),intent(in) :: re64_1,re64_2
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    if( isnan(re64_1) .or. abs(re64_1) > HUGE(real64)  )then
+        write(obj%fh, '(A)') "NaN "//trim(str(re64_2))
+    elseif( isnan(re64_2) .or. abs(re64_2) > HUGE(real64) )then
+        write(obj%fh, '(A)') trim(str(re64_1))//" NaN"
+    else
+        write(obj%fh, '(A)') trim(str(re64_1))//" "//trim(str(re64_2))
+    endif
+end subroutine 
+
+! ####################################################
+
+! #############################################
+
+
+subroutine writeIOre64re64re64(obj,re64_1,re64_2,re64_3)
+    class(IO_),intent(inout) :: obj
+    real(real64),intent(in) :: re64_1,re64_2,re64_3
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(re64_1))//" "//trim(str(re64_2))//" "//trim(str(re64_3))
+
+end subroutine 
+
+! ####################################################
+
+! #############################################
+
+
+subroutine writeIOre64re64re64re64(obj,re64_1,re64_2,re64_3,re64_4)
+    class(IO_),intent(inout) :: obj
+    real(real64),intent(in) :: re64_1,re64_2,re64_3,re64_4
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(re64_1))//" "//trim(str(re64_2))//" "//trim(str(re64_3))//" "//trim(str(re64_4))
+
+end subroutine 
+
+! ####################################################
+
+
+! #############################################
+
+
+subroutine writeIOre64re64re64re64re64(obj,re64_1,re64_2,re64_3,re64_4,re64_5)
+    class(IO_),intent(inout) :: obj
+    real(real64),intent(in) :: re64_1,re64_2,re64_3,re64_4,re64_5
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(re64_1))//" "//trim(str(re64_2))//" "&
+        //trim(str(re64_3))//" "//trim(str(re64_4))//" "//trim(str(re64_5))
+
+end subroutine 
+
+! ####################################################
+
+
+! #############################################
+
+
+subroutine writeIOre64re64re64re64re64re64(obj,re64_1,re64_2,re64_3,re64_4,re64_5,re64_6)
+    class(IO_),intent(inout) :: obj
+    real(real64),intent(in) :: re64_1,re64_2,re64_3,re64_4,re64_5,re64_6
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    
+    write(obj%fh, '(A)') trim(str(re64_1))//" "//trim(str(re64_2))//" "&
+        //trim(str(re64_3))//" "//trim(str(re64_4))//" "//trim(str(re64_5))&
+        //" "//trim(str(re64_6))
+
+end subroutine 
+
+! ####################################################
+
+
 
 
 ! #############################################
@@ -646,6 +1008,39 @@ subroutine writeIOstring(obj,string)
 end subroutine writeIOstring
 ! #############################################
 
+
+! #############################################
+subroutine writeIOstringstring(obj,string1,string2)
+    class(IO_),intent(inout) :: obj
+    type(String_),intent(in) :: string1,string2
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    write(obj%fh, '(A)') str(string1)//str(string2)
+    
+
+end subroutine 
+! #############################################
+
+! #############################################
+subroutine writeIOstringstringstring(obj,string1,string2,string3)
+    class(IO_),intent(inout) :: obj
+    type(String_),intent(in) :: string1,string2,string3
+
+    if(obj%state=="r")then
+        call print("IOClass >> Error >> This file is readonly. ")
+        call print("Nothing is written.")
+        return
+    endif
+    write(obj%fh, '(A)') str(string1)//" "//str(string2)//" "//str(string3)
+    
+
+end subroutine 
+! #############################################
+
 ! #############################################
 subroutine readIOchar(obj,char) 
     class(IO_),intent(inout) :: obj
@@ -672,10 +1067,9 @@ subroutine closeIO(obj)
     class(IO_),intent(inout) :: obj
 
     if(obj%active .eqv. .false.)then
-        print *, "ERROR :: "//"file is already closed."
-        stop
+        print *, "ERROR :: "//"file is already closed. filename = "//obj%filename
+        return
     endif
-
     close(obj%fh)
     obj%fh=0
     obj%active=.false.
@@ -693,15 +1087,6 @@ end subroutine
 ! #############################################
 
 ! #############################################
-subroutine printString(char)
-    type(String_) :: char
-
-    write(*,'(A)' ) trim(char%all)
-
-end subroutine
-! #############################################
-
-! #############################################
 subroutine printReal64(re64)
     real(real64),intent(in) :: re64
     character(20) :: char
@@ -711,6 +1096,9 @@ subroutine printReal64(re64)
 
 end subroutine
 ! #############################################
+
+
+
 ! #############################################
 subroutine printReal32(re32)
     real(real32),intent(in) :: re32
@@ -847,5 +1235,219 @@ subroutine spyRealArray(array)
 
 
 end subroutine
+
+subroutine plotIO(obj,name,option)
+    class(IO_),intent(inout) ::  obj
+    character(*),optional,intent(in) :: name
+    character(*),optional,intent(in) :: option
+    type(IO_) :: gp_script
+
+    if(present(name) )then
+        obj%filename = name
+    endif
+    call obj%open(obj%filename,"r")
+    call gp_script%open(trim(obj%filename)//"_gp_script.gp","w")
+    call gp_script%write("set xlabel '"//obj%xlabel//"'")
+    call gp_script%write("set ylabel '"//obj%ylabel//"'")
+    call gp_script%write("set title '"//obj%title//"'")
+    if(present(option) )then
+        call gp_script%write("plot '"//obj%filename//"' "//option)
+    else
+        call gp_script%write("plot '"//obj%filename//"' ")
+    endif
+
+
+    call gp_script%close()
+    call system("gnuplot "//trim(obj%filename)//"_gp_script.gp -pause")
+    call obj%close()
+end subroutine
+
+
+subroutine splotIO(obj,name,option)
+    class(IO_),intent(inout) ::  obj
+    character(*),optional,intent(in) :: name
+    character(*),optional,intent(in) :: option
+    type(IO_) :: gp_script
+
+    if(present(name) )then
+        obj%filename = name
+    endif
+    call obj%open(obj%filename,"r")
+    call gp_script%open(trim(obj%filename)//"_gp_script.gp","w")
+    call gp_script%write("set xlabel '"//obj%xlabel//"'")
+    call gp_script%write("set ylabel '"//obj%ylabel//"'")
+    call gp_script%write("set zlabel '"//obj%zlabel//"'")
+    call gp_script%write("set title '"//obj%title//"'")
+    if(present(option) )then
+        call gp_script%write("splot '"//obj%filename//"' "//option)
+    else
+        call gp_script%write("splot '"//obj%filename//"' ")
+    endif
+
+    call gp_script%close()
+    call system("gnuplot "//trim(obj%filename)//"_gp_script.gp -pause")
+
+end subroutine
+
+subroutine flushIO(obj)
+    class(IO_),intent(in) :: obj
+
+    flush(obj%fh)
+    
+end subroutine
+
+
+
+function parseIOChar200(obj,filename,fileformat,key1,debug) result(ret)
+    class(IO_),intent(inout) :: obj
+    integer(int32),optional,intent(in) :: fileformat
+    character(*),intent(in) :: key1
+    character(*),optional,intent(in) :: filename
+    character(:),allocatable :: line
+    integer(int32)::blcount=0
+    integer(int32)::rmc,id,fformat
+    character(200) :: ret
+    logical,optional,intent(in) :: debug
+
+    ret = " "
+    fformat = input(default=1,option=fileformat)
+
+    if(present(filename) )then
+        call obj%open(filename,"r")
+        if(index(filename,".json")/=0 )then
+            fformat = 1
+        endif
+    endif
+
+
+
+    if(fformat==PF_JSON)then 
+        do
+            line = obj%readline()
+            if(present(debug) )then
+                if(debug)then
+                    print *, trim(line)
+                endif
+            endif
+            if( adjustl(trim(line))=="{" )then
+                blcount=1
+                cycle
+            endif
+            if( adjustl(trim(line))=="}" )then
+                exit
+            endif
+
+            if(blcount==1)then
+                if(index(line,trim(key1) )/=0)then
+                    rmc=index(line,",")
+                    ! カンマがあれば除く
+                    if(rmc /= 0)then
+                        line(rmc:rmc)=" "
+                    endif
+                    id = index(line,":")
+                    read(line(id+1:),*) ret
+                    ret = adjustl(ret)
+                    exit
+                else
+                    cycle
+                endif
+            endif
+
+            if(obj%EOF) exit
+
+        enddo
+    endif
+    
+    if(present(filename) )then
+        call obj%close()
+    endif
+    
+
+end function
+
+
+
+function parseIO2keysChar200(obj,filename,fileformat,key1,key2,debug) result(ret)
+    class(IO_),intent(inout) :: obj
+    integer(int32),optional,intent(in) :: fileformat
+    character(*),intent(in) :: key1,key2
+    character(*),optional,intent(in) :: filename
+    character(:),allocatable :: line
+    integer(int32)::blcount=0
+    integer(int32)::rmc,id,fformat
+    character(200) :: ret
+    logical,optional,intent(in) :: debug
+    ret = " "
+
+    fformat = input(default=1,option=fileformat)
+    if(present(filename) )then
+        call obj%open(filename,"r")
+        if(index(filename,".json")/=0 )then
+            fformat = 1
+        endif
+    endif
+
+
+    if(fformat==PF_JSON)then 
+        do
+            line = obj%readline()
+            if(present(debug) )then
+                if(debug)then
+                    print *, trim(line)
+                endif
+            endif
+            if( adjustl(trim(line))=="{" )then
+                blcount=1
+                cycle
+            endif
+            if( adjustl(trim(line))=="}" )then
+                exit
+            endif
+
+            if(blcount==1)then
+                if(index(line,trim(key1) )/=0)then
+                    ! search for the second key
+                    do 
+                        line = obj%readline()
+                        if(present(debug) )then
+                            if(debug)then
+                                print *, trim(line)
+                            endif
+                        endif
+
+                        if( index(line,"}")/=0 )then
+                            exit
+                        endif
+                        
+                        
+                        if(index(line,trim(key2))/=0 )then
+                            rmc=index(line,",")
+                            if(rmc /= 0)then
+                                line(rmc:rmc)=" "
+                            endif
+                            id = index(line,":")
+                            read(line(id+1:),*) ret
+                            ret = adjustl(ret)
+                            exit
+                        endif
+
+                    enddo
+                else
+                    cycle
+                endif
+            endif
+
+            if(obj%EOF) exit
+
+        enddo
+    endif
+    
+    if(present(filename) )then
+        call obj%close()
+    endif
+    
+
+end function
+
 
 end module IOClass

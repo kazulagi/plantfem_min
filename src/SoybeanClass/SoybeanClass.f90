@@ -19,6 +19,8 @@ module SoybeanClass
         integer(int32) :: MaxLeafNum= 300
         integer(int32) :: MaxRootNum=300
         integer(int32) :: MaxStemNum= 300
+
+        
         
         integer(int32)  :: ms_node,br_node(300),br_from(300)
         real(real64)    :: ms_length,br_length(300)
@@ -61,6 +63,19 @@ module SoybeanClass
         type(Leaf_),allocatable :: Leaf(:)
         type(Root_),allocatable :: Root(:)
         type(Soil_),allocatable :: Soil
+
+        ! material info
+        real(real64),allocatable :: stemYoungModulus(:)
+        real(real64),allocatable :: leafYoungModulus(:)
+        real(real64),allocatable :: rootYoungModulus(:)
+
+        real(real64),allocatable :: stemPoissonRatio(:)
+        real(real64),allocatable :: leafPoissonRatio(:)
+        real(real64),allocatable :: rootPoissonRatio(:)
+
+        real(real64),allocatable :: stemDensity(:)
+        real(real64),allocatable :: leafDensity(:)
+        real(real64),allocatable :: rootDensity(:)
         
         ! 節-節点データ構造
         type(Mesh_) :: struct 
@@ -93,11 +108,14 @@ module SoybeanClass
         !procedure,public :: addLeaf => addLeafSoybean
 
         procedure,public :: Init => initsoybean
+        procedure,public :: create => initsoybean
         procedure,public :: new => initsoybean
         procedure,public :: sowing => initsoybean
         procedure,public :: export => exportSoybean
 
         procedure,public :: grow => growSoybean
+        procedure,public :: getVolume => getVolumeSoybean
+        procedure,public :: getBioMass => getBioMassSoybean
         procedure,public :: deform => deformSoybean
         
         procedure,public :: show => showSoybean
@@ -278,6 +296,7 @@ subroutine initsoybean(obj,config,&
     integer(int32) :: num_leaf
     real(real64)::readvalreal
     integer(int32) :: readvalint
+    logical :: debug=.false.
     type(IO_) :: soyconf
     type(Random_) :: random
 
@@ -407,7 +426,7 @@ subroutine initsoybean(obj,config,&
     blcount=0
     do
         read(soyconf%fh,'(a)') line
-        print *, trim(line)
+        if(debug) print *, trim(line)
         if( adjustl(trim(line))=="{" )then
             blcount=1
             cycle
@@ -431,7 +450,7 @@ subroutine initsoybean(obj,config,&
             if(index(line,"Mainstem")/=0)then
                 do
                     read(soyconf%fh,'(a)') line
-                    print *, trim(line)
+                    if(debug) print *, trim(line)
                     if( index(line,"}")/=0 )then
                         exit
                     endif
@@ -486,12 +505,12 @@ subroutine initsoybean(obj,config,&
                     line(rmc:rmc)=" "
                 endif
                 id = index(line,"#")
-                print *, trim(line)
+                if(debug) print *, trim(line)
                 read(line(id+1:),*) branch_id
 
                 do
                     read(soyconf%fh,'(a)') line
-                    print *, trim(line)
+                    if(debug) print *, trim(line)
                     if( index(line,"}")/=0 )then
                         exit
                     endif
@@ -540,7 +559,7 @@ subroutine initsoybean(obj,config,&
             if(index(line,"Mainroot")/=0)then
                 do
                     read(soyconf%fh,'(a)') line
-                    print *, trim(line)
+                    if(debug) print *, trim(line)
                     if( index(line,"}")/=0 )then
                         exit
                     endif
@@ -595,12 +614,12 @@ subroutine initsoybean(obj,config,&
                     line(rmc:rmc)=" "
                 endif
                 id = index(line,"#")
-                print *, trim(line)
+                if(debug) print *, trim(line)
                 read(line(id+1:),*) branch_id
 
                 do
                     read(soyconf%fh,'(a)') line
-                    print *, trim(line)
+                    if(debug) print *, trim(line)
                     if( index(line,"}")/=0 )then
                         exit
                     endif
@@ -1136,6 +1155,30 @@ subroutine initsoybean(obj,config,&
         allocate(obj%leaf(obj%MaxLeafNum) )
         allocate(obj%root(obj%MaxrootNum) )
         allocate(obj%stem(obj%MaxstemNum) )
+
+        allocate(obj%leafYoungModulus(obj%MaxLeafNum) )
+        allocate(obj%rootYoungModulus(obj%MaxrootNum) )
+        allocate(obj%stemYoungModulus(obj%MaxstemNum) )
+        ! default value
+        obj%leafYoungModulus(:) = 1000.0d0
+        obj%rootYoungModulus(:) = 1000.0d0
+        obj%stemYoungModulus(:) = 1000.0d0
+        
+        allocate(obj%leafPoissonRatio(obj%MaxLeafNum) )
+        allocate(obj%rootPoissonRatio(obj%MaxrootNum) )
+        allocate(obj%stemPoissonRatio(obj%MaxstemNum) )
+        obj%leafPoissonRatio(:) = 0.30d0
+        obj%rootPoissonRatio(:) = 0.30d0
+        obj%stemPoissonRatio(:) = 0.30d0
+        
+        allocate(obj%leafDensity(obj%MaxLeafNum) )
+        allocate(obj%rootDensity(obj%MaxrootNum) )
+        allocate(obj%stemDensity(obj%MaxstemNum) )
+
+        obj%leafDensity(:) = 0.0d0
+        obj%rootDensity(:) = 0.0d0
+        obj%stemDensity(:) = 0.0d0
+
         allocate(obj%stem2stem(obj%MaxstemNum,obj%MaxstemNum) )
         allocate(obj%leaf2stem(obj%MaxstemNum,obj%MaxLeafNum) )
         allocate(obj%root2stem(obj%MaxrootNum,obj%MaxstemNum) )
@@ -1202,7 +1245,8 @@ subroutine initsoybean(obj,config,&
         ! peti and leaf
         num_stem_node = k
         num_leaf = 0
-        do i=1, num_stem_node
+        ! bugfix 2021/08/18
+        do i=1, k
             ! ３複葉
             ! add peti
             num_stem_node = num_stem_node +1
@@ -1228,7 +1272,7 @@ subroutine initsoybean(obj,config,&
             ! add leaves
             do j=1,3
                 num_leaf=num_leaf+1
-                call obj%leaf(num_leaf)%init(config=obj%leafconfig)
+                call obj%leaf(num_leaf)%init(config=obj%leafconfig,species=PF_GLYCINE_SOJA)
                 call obj%leaf(num_leaf)%resize(&
                     y = random%gauss(mu=obj%leaf_thickness_ave(i),sigma=obj%leaf_thickness_sig(i))  , &
                     z = random%gauss(mu=obj%leaf_length_ave(i)   ,sigma=obj%leaf_length_sig(i)) , &
@@ -1308,6 +1352,30 @@ subroutine initsoybean(obj,config,&
         allocate(obj%leaf(obj%MaxLeafNum) )
         allocate(obj%root(obj%MaxrootNum) )
         allocate(obj%stem(obj%MaxstemNum) )
+
+        allocate(obj%leafYoungModulus(obj%MaxLeafNum) )
+        allocate(obj%rootYoungModulus(obj%MaxrootNum) )
+        allocate(obj%stemYoungModulus(obj%MaxstemNum) )
+        ! default value
+        obj%leafYoungModulus(:) = 1000.0d0
+        obj%rootYoungModulus(:) = 1000.0d0
+        obj%stemYoungModulus(:) = 1000.0d0
+        
+        allocate(obj%leafPoissonRatio(obj%MaxLeafNum) )
+        allocate(obj%rootPoissonRatio(obj%MaxrootNum) )
+        allocate(obj%stemPoissonRatio(obj%MaxstemNum) )
+        obj%leafPoissonRatio(:) = 0.30d0
+        obj%rootPoissonRatio(:) = 0.30d0
+        obj%stemPoissonRatio(:) = 0.30d0
+        
+        allocate(obj%leafDensity(obj%MaxLeafNum) )
+        allocate(obj%rootDensity(obj%MaxrootNum) )
+        allocate(obj%stemDensity(obj%MaxstemNum) )
+
+        obj%leafDensity(:) = 0.0d0
+        obj%rootDensity(:) = 0.0d0
+        obj%stemDensity(:) = 0.0d0
+
         allocate(obj%stem2stem(obj%MaxstemNum,obj%MaxstemNum) )
         allocate(obj%leaf2stem(obj%MaxstemNum,obj%MaxLeafNum) )
         allocate(obj%root2stem(obj%MaxrootNum,obj%MaxstemNum) )
@@ -1318,9 +1386,9 @@ subroutine initsoybean(obj,config,&
         !allocate(obj%struct%ElemMat(3) )
         ! 子葉結節部=(0,0,0)
         !obj%struct%NodCoord(1,1:3) = 0.0d0
-        call obj%leaf(1)%init(obj%leafconfig)
+        call obj%leaf(1)%init(obj%leafconfig,species=PF_GLYCINE_SOJA)
         call obj%leaf(1)%rotate(x=radian(90.0d0),y=radian(90.0d0),z=radian(10.0d0) )
-        call obj%leaf(2)%init(obj%leafconfig)
+        call obj%leaf(2)%init(obj%leafconfig,species=PF_GLYCINE_SOJA)
         call obj%leaf(2)%rotate(x=radian(90.0d0),y=radian(90.0d0),z=radian(-10.0d0) )
         
         call obj%stem(1)%init(obj%stemconfig)
@@ -1951,23 +2019,29 @@ subroutine vtkSoybean(obj,name)
     character(*),intent(in) :: name
     integer(int32) :: i
 
-    do i=1,size(obj%stem)
-        if(obj%stem(i)%femdomain%mesh%empty() .eqv. .false. )then
-            call obj%stem(i)%vtk(name=trim(name)//"_stem"//trim(str(i)))
-        endif
-    enddo
+    if(allocated(obj%stem) )then
+        do i=1,size(obj%stem)
+            if(obj%stem(i)%femdomain%mesh%empty() .eqv. .false. )then
+                call obj%stem(i)%vtk(name=trim(name)//"_stem"//trim(str(i)))
+            endif
+        enddo
+    endif
 
-    do i=1,size(obj%root)
-        if(obj%root(i)%femdomain%mesh%empty() .eqv. .false. )then
-            call obj%root(i)%vtk(name=trim(name)//"_root"//trim(str(i)))
-        endif
-    enddo
+    if(allocated(obj%root))then
+        do i=1,size(obj%root)
+            if(obj%root(i)%femdomain%mesh%empty() .eqv. .false. )then
+                call obj%root(i)%vtk(name=trim(name)//"_root"//trim(str(i)))
+            endif
+        enddo
+    endif
 
-    do i=1,size(obj%leaf)
-        if(obj%leaf(i)%femdomain%mesh%empty() .eqv. .false. )then
-            call obj%leaf(i)%vtk(name=trim(name)//"_leaf"//trim(str(i)))
-        endif
-    enddo
+    if(allocated(obj%leaf))then
+        do i=1,size(obj%leaf)
+            if(obj%leaf(i)%femdomain%mesh%empty() .eqv. .false. )then
+                call obj%leaf(i)%vtk(name=trim(name)//"_leaf"//trim(str(i)))
+            endif
+        enddo
+    endif
 
 end subroutine
 ! ########################################
@@ -2341,86 +2415,155 @@ subroutine deformSoybean(obj,penaltyparameter,groundLevel,disp,x_min,x_max,y_min
         return
     endif
     numDomain = 0
-    do i=1,size(obj%stem)
-        if(obj%stem(i)%femdomain%mesh%empty() )then
-            cycle
-        else
-            numDomain = numDomain + 1
-        endif
-    enddo
-    do i=1,size(obj%leaf)
-        if(obj%leaf(i)%femdomain%mesh%empty() )then
-            cycle
-        else
-            numDomain = numDomain + 1
-        endif
-    enddo
-    do i=1,size(obj%root)
-        if(obj%root(i)%femdomain%mesh%empty() )then
-            cycle
-        else
-            numDomain = numDomain + 1
-        endif
-    enddo
+    
+    if(allocated(obj%stem) )then
+        do i=1,size(obj%stem)
+            if(obj%stem(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+            endif
+        enddo
+    endif
+    if(allocated(obj%leaf) )then
+        do i=1,size(obj%leaf)
+            if(obj%leaf(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+            endif
+        enddo
+    endif
+    if(allocated(obj%root) )then
+        do i=1,size(obj%root)
+            if(obj%root(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+            endif
+        enddo
+    endif
     
     allocate(domainsp(numDomain) )
     numDomain=0
     stemDomain=0
-    do i=1,size(obj%stem)
-        if(obj%stem(i)%femdomain%mesh%empty() )then
-            cycle
-        else
-            numDomain = numDomain + 1
-            stemDomain = stemDomain + 1
-            domainsp(numDomain)%femdomainp =>  obj%stem(i)%femdomain
-        endif
-    enddo
+    if(allocated(obj%stem) )then
+        do i=1,size(obj%stem)
+            if(obj%stem(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+                stemDomain = stemDomain + 1
+                domainsp(numDomain)%femdomainp =>  obj%stem(i)%femdomain
+            endif
+        enddo
+    endif
+
     leafDomain = 0
-    do i=1,size(obj%leaf)
-        if(obj%leaf(i)%femdomain%mesh%empty() )then
-            cycle
-        else
-            numDomain = numDomain + 1
-            leafDomain = leafDomain + 1
-            domainsp(numDomain)%femdomainp =>  obj%leaf(i)%femdomain
-        endif
-    enddo
+    if(allocated(obj%leaf) )then
+        do i=1,size(obj%leaf)
+            if(obj%leaf(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+                leafDomain = leafDomain + 1
+                domainsp(numDomain)%femdomainp =>  obj%leaf(i)%femdomain
+            endif
+        enddo
+    endif
+
     rootDomain = 0
-    do i=1,size(obj%root)
-        if(obj%root(i)%femdomain%mesh%empty() )then
-            cycle
-        else
-            numDomain = numDomain + 1
-            rootDomain = rootDomain + 1
-            domainsp(numDomain)%femdomainp =>  obj%root(i)%femdomain
-        endif
-    enddo
-    
+    if(allocated(obj%root) )then
+        do i=1,size(obj%root)
+            if(obj%root(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+                rootDomain = rootDomain + 1
+                domainsp(numDomain)%femdomainp =>  obj%root(i)%femdomain
+            endif
+        enddo
+    endif
 
     contactlist = zeros(numDomain,numDomain)
-    do i=1,stemDomain
-        do j=1,stemDomain
-            contactlist( i, j  ) = obj%stem2stem(i,j)
+    if(allocated(obj%stem2stem))then
+        do i=1,stemDomain
+            do j=1,stemDomain
+                contactlist( i, j  ) = obj%stem2stem(i,j)
+            enddo
         enddo
-    enddo
-    do i=1,leafDomain
-        do j=1,stemDomain
-            contactlist( i + stemDomain, j  ) = obj%leaf2stem(i,j)
-        enddo
-    enddo
-    do i=1,rootDomain
-        do j=1,stemDomain
-            contactlist( i + stemDomain + leafDomain, j  ) = obj%root2stem(i,j)
-        enddo
-    enddo
-    do i=1,rootDomain
-        do j=1,rootDomain
-            contactlist( i + stemDomain + leafDomain, j+ stemDomain + leafDomain  ) = obj%root2root(i,j)
-        enddo
-    enddo
+    endif
 
+    if(allocated(obj%leaf2stem) )then
+        do i=1,leafDomain
+            do j=1,stemDomain
+                contactlist( i + stemDomain, j  ) = obj%leaf2stem(i,j)
+            enddo
+        enddo
+    endif
+
+    if(allocated(obj%root2stem) )then
+        do i=1,rootDomain
+            do j=1,stemDomain
+                contactlist( i + stemDomain + leafDomain, j  ) = obj%root2stem(i,j)
+            enddo
+        enddo
+    endif
+
+    if(allocated(obj%root2root) )then
+        do i=1,rootDomain
+            do j=1,rootDomain
+                contactlist( i + stemDomain + leafDomain, j+ stemDomain + leafDomain  ) = obj%root2root(i,j)
+            enddo
+        enddo
+    endif
+    !call print(contactlist)
+    !stop
     call obj%contact%init(femdomainsp=domainsp,contactlist=contactlist)
+
+    ! load material info
+    numDomain = 0
+    if(allocated(obj%stem) )then
+        do i=1,size(obj%stem)
+            if(obj%stem(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+                call obj%contact%setYoungModulus(YoungModulus=obj%stemYoungModulus(i),DomainID=numDomain) 
+                call obj%contact%setPoissonRatio(PoissonRatio=obj%stemPoissonRatio(i),DomainID=numDomain) 
+                call obj%contact%setDensity(density=obj%stemDensity(i),DomainID=numDomain) 
+            endif
+        enddo
+    endif
+    if(allocated(obj%leaf) )then
+        do i=1,size(obj%leaf)
+            if(obj%leaf(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+                call obj%contact%setYoungModulus(YoungModulus=obj%leafYoungModulus(i),DomainID=numDomain) 
+                call obj%contact%setPoissonRatio(PoissonRatio=obj%leafPoissonRatio(i),DomainID=numDomain) 
+                call obj%contact%setDensity(density=obj%leafDensity(i),DomainID=numDomain) 
+            endif
+        enddo
+    endif
+    if(allocated(obj%root) )then
+        do i=1,size(obj%root)
+            if(obj%root(i)%femdomain%mesh%empty() )then
+                cycle
+            else
+                numDomain = numDomain + 1
+                call obj%contact%setYoungModulus(YoungModulus=obj%rootYoungModulus(i),DomainID=numDomain) 
+                call obj%contact%setPoissonRatio(PoissonRatio=obj%rootPoissonRatio(i),DomainID=numDomain) 
+                call obj%contact%setDensity(density=obj%rootDensity(i),DomainID=numDomain) 
+            endif
+        enddo
+    endif
+    !
+
+
     penalty = input(default=1000.0d0, option=penaltyparameter)
+    
     call obj%contact%setup(penaltyparameter=penalty)
 
     ! if displacement is set, load displacement
@@ -2440,7 +2583,7 @@ subroutine deformSoybean(obj,penaltyparameter,groundLevel,disp,x_min,x_max,y_min
                 z_min=z_min,z_max=z_max)
         enddo    
     endif
-
+    
 
     Glevel = input(default=0.0d0,option=groundLevel)
     ! under-ground parts are fixed.
@@ -2458,7 +2601,109 @@ subroutine deformSoybean(obj,penaltyparameter,groundLevel,disp,x_min,x_max,y_min
     ! update mesh
     call obj%contact%updateMesh()
 
+
 end subroutine
+
+function getVolumeSoybean(obj,stem,leaf,root) result(ret)
+    class(Soybean_),intent(in) :: obj
+    logical,optional,intent(in) :: stem, leaf, root
+    logical :: all
+    integer(int32) :: i,j
+    real(real64) :: ret
+
+    all = .false.
+    if(.not.present(stem) .and..not.present(leaf)  )then
+        if(.not. present(root) )then
+            all = .true.
+        endif
+    endif
+
+    ret =0.0d0
+    if(all)then
+        do i=1,size(obj%stem)
+            if( .not.obj%stem(i)%femdomain%mesh%empty() )then
+                do j=1,obj%stem(i)%femdomain%ne()
+                    ret = ret + obj%stem(i)%femdomain%getVolume(elem=j)
+                enddo
+            endif
+        enddo
+        do i=1,size(obj%leaf)
+            if( .not.obj%leaf(i)%femdomain%mesh%empty() )then
+                do j=1,obj%leaf(i)%femdomain%ne()
+                    ret = ret + obj%leaf(i)%femdomain%getVolume(elem=j)
+                enddo
+            endif
+        enddo
+        do i=1,size(obj%root)
+            if( .not.obj%root(i)%femdomain%mesh%empty() )then
+                do j=1,obj%root(i)%femdomain%ne()
+                    ret = ret + obj%root(i)%femdomain%getVolume(elem=j)
+                enddo
+            endif
+        enddo
+        return
+    endif
+
+    if(present(stem))then
+        if(stem  .or. all)then
+            do i=1,size(obj%stem)
+                if( .not.obj%stem(i)%femdomain%mesh%empty() )then
+                    do j=1,obj%stem(i)%femdomain%ne()
+                        ret = ret + obj%stem(i)%femdomain%getVolume(elem=j)
+                    enddo
+                endif
+            enddo
+        endif
+    endif
+    if(present(leaf) )then
+        if(leaf )then
+            do i=1,size(obj%leaf)
+                if( .not.obj%leaf(i)%femdomain%mesh%empty() )then
+                    do j=1,obj%leaf(i)%femdomain%ne()
+                        ret = ret + obj%leaf(i)%femdomain%getVolume(elem=j)
+                    enddo
+                endif
+            enddo
+        endif
+    endif
+    if(present(root))then
+        if(root)then
+            do i=1,size(obj%root)
+                if( .not.obj%root(i)%femdomain%mesh%empty() )then
+                    do j=1,obj%root(i)%femdomain%ne()
+                        ret = ret + obj%root(i)%femdomain%getVolume(elem=j)
+                    enddo
+                endif
+            enddo
+        endif
+    endif
+
+end function
+
+function getBioMassSoybean(obj,stemDensity,leafDensity,rootDensity) result(ret)
+    class(Soybean_),intent(in) :: obj
+    real(real64),optional,intent(in) :: stemDensity,leafDensity,rootDensity
+    logical :: all
+    integer(int32) :: i,j
+    real(real64) :: ret
+
+    ret = 0.0d0
+
+    if(present(stemDensity))then
+        ret = ret + obj%getVolume(stem=.true.) * stemDensity
+    endif
+
+    if(present(leafDensity))then
+        ret = ret + obj%getVolume(leaf=.true.) * leafDensity
+    endif
+
+    if(present(rootDensity))then
+        ret = ret + obj%getVolume(root=.true.) * rootDensity
+    endif
+
+
+
+end function
 
 
 end module

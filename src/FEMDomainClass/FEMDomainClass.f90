@@ -6,35 +6,35 @@ module FEMDomainClass
     use MeshClass
     use MaterialPropClass
     use BoundaryConditionClass
-	use ControlParaeterClass
+	use ControlParameterClass
 	use std
 	
 	implicit none
 
 	! VTK-FORMAT
-	integer(int32),public :: VTK_VERTEX		 = 1 !	Vertex
-	integer(int32),public :: VTK_POLY_VERTEX = 2 !	Vertex
-	integer(int32),public :: VTK_LINE		 = 3 !	Edge Lagrange P1
-	integer(int32),public :: VTK_TRIANGLE	 = 5 !	Triangle Lagrange P1
-	integer(int32),public :: VTK_PIXEL		 = 8 !	Quadrilateral Lagrange P1
-	integer(int32),public :: VTK_QUAD		 = 9 !	Quadrilateral Lagrange P1
-	integer(int32),public :: VTK_TETRA		 = 10 !	Tetrahedron Lagrange P1
-	integer(int32),public :: VTK_VOXEL		 = 11 !	Hexahedron Lagrange P1
-	integer(int32),public :: VTK_HEXAHEDRON  = 12 !	Hexahedron Lagrange P1
-	integer(int32),public :: VTK_WEDGE		 = 13 !	Wedge Lagrange P1
-	integer(int32),public :: VTK_QUADRATIC_EDGE 	 = 21 !	Edge Lagrange P2
-	integer(int32),public :: VTK_QUADRATIC_TRIANGLE  = 22 !	Triangle Lagrange P2
-	integer(int32),public :: VTK_QUADRATIC_QUAD		 = 23 !	Quadrilateral Lagrange P2
-	integer(int32),public :: VTK_QUADRATIC_TETRA	 = 24 !	Tetrahedron Lagrange P2
-	integer(int32),public :: VTK_QUADRATIC_HEXAHEDRON = 25 !	Hexahedron Lagrange P
+	integer(int32),parameter,public :: VTK_VERTEX		 = 1 !	Vertex
+	integer(int32),parameter,public :: VTK_POLY_VERTEX = 2 !	Vertex
+	integer(int32),parameter,public :: VTK_LINE		 = 3 !	Edge Lagrange P1
+	integer(int32),parameter,public :: VTK_TRIANGLE	 = 5 !	Triangle Lagrange P1
+	integer(int32),parameter,public :: VTK_PIXEL		 = 8 !	Quadrilateral Lagrange P1
+	integer(int32),parameter,public :: VTK_QUAD		 = 9 !	Quadrilateral Lagrange P1
+	integer(int32),parameter,public :: VTK_TETRA		 = 10 !	Tetrahedron Lagrange P1
+	integer(int32),parameter,public :: VTK_VOXEL		 = 11 !	Hexahedron Lagrange P1
+	integer(int32),parameter,public :: VTK_HEXAHEDRON  = 12 !	Hexahedron Lagrange P1
+	integer(int32),parameter,public :: VTK_WEDGE		 = 13 !	Wedge Lagrange P1
+	integer(int32),parameter,public :: VTK_QUADRATIC_EDGE 	 = 21 !	Edge Lagrange P2
+	integer(int32),parameter,public :: VTK_QUADRATIC_TRIANGLE  = 22 !	Triangle Lagrange P2
+	integer(int32),parameter,public :: VTK_QUADRATIC_QUAD		 = 23 !	Quadrilateral Lagrange P2
+	integer(int32),parameter,public :: VTK_QUADRATIC_TETRA	 = 24 !	Tetrahedron Lagrange P2
+	integer(int32),parameter,public :: VTK_QUADRATIC_HEXAHEDRON = 25 !	Hexahedron Lagrange P
 
-	integer(int32),public :: MSH_LINE		 = 1 !	Edge Lagrange P1
-	integer(int32),public :: MSH_TRIANGLE	 = 2 !	Triangle Lagrange P1
-	integer(int32),public :: MSH_QUAD		 = 3 !	Quadrilateral Lagrange P1
-	integer(int32),public :: MSH_TETRA		 = 4 !	Tetrahedron Lagrange P1
-	integer(int32),public :: MSH_HEXAHEDRON  = 5 !	Hexahedron Lagrange P1
-	integer(int32),public :: MSH_PRISM 	 = 6 !	Edge Lagrange P2
-	integer(int32),public :: MSH_PYRAMID  = 7 !	Triangle Lagrange P2
+	integer(int32),parameter,public :: MSH_LINE		 = 1 !	Edge Lagrange P1
+	integer(int32),parameter,public :: MSH_TRIANGLE	 = 2 !	Triangle Lagrange P1
+	integer(int32),parameter,public :: MSH_QUAD		 = 3 !	Quadrilateral Lagrange P1
+	integer(int32),parameter,public :: MSH_TETRA		 = 4 !	Tetrahedron Lagrange P1
+	integer(int32),parameter,public :: MSH_HEXAHEDRON  = 5 !	Hexahedron Lagrange P1
+	integer(int32),parameter,public :: MSH_PRISM 	 = 6 !	Edge Lagrange P2
+	integer(int32),parameter,public :: MSH_PYRAMID  = 7 !	Triangle Lagrange P2
 	
 	type::Meshp_
 		type(Mesh_),pointer :: Meshp
@@ -125,12 +125,15 @@ module FEMDomainClass
 		procedure,public :: copy => copyFEMDomain
 		procedure,public :: convertMeshType => convertMeshTypeFEMDomain
 		procedure,public :: contactdetect => contactdetectFEMDomain
+		procedure,public :: centerPosition => centerPositionFEMDomain
 		procedure,public :: create => createFEMDomain
 
         procedure,public :: delete => DeallocateFEMDomain
 		procedure,public :: display => displayFEMDomain
 		procedure,public :: divide => divideFEMDomain
-		procedure,public :: distribute => distributeFEMDomain
+		!procedure,public :: distribute => distributeFEMDomain
+		procedure,public :: Delaunay3D => Delaunay3DFEMDomain
+		procedure,public :: Delaunay2D => Delaunay2DFEMDomain
 		
 		procedure,public :: export => ExportFEMDomain
 
@@ -147,16 +150,20 @@ module FEMDomainClass
 		procedure,public :: gnuplotExportStress => GnuplotExportStress  
 		procedure,public :: getDBCVector => getDBCVectorFEMDomain
 		procedure,public :: getVolume => getVolumeFEMDomain
+		procedure,public :: getJacobiMatrix => getJacobiMatrixFEMDomain
 		procedure,public :: getLayerID => getLayerIDFEMDomain
 		procedure,public :: getLayerAttribute => getLayerAttributeFEMDomain
 		procedure,public :: getLayerDataStyle => getLayerDataStyleFEMDomain
 		procedure,public :: getShapeFunction => getShapeFunctionFEMDomain
 		procedure,public :: getNearestNodeID => getNearestNodeIDFEMDomain
 		procedure,public :: getSurface => getSurfaceFEMDomain
-		procedure,public :: getLocalCoordinate => getLocalCoordinateFEMDomain		
+		procedure,public :: getElement => getElementFEMDOmain
+		procedure,public :: getLocalCoordinate => getLocalCoordinateFEMDomain	
+		procedure,public :: GlobalPositionOfGaussPoint => getGlobalPositionOfGaussPointFEMDomain	
 		
         procedure,public :: init   => InitializeFEMDomain
 		procedure,public :: import => ImportFEMDomain
+		procedure,public :: importVTKFile => ImportVTKFileFEMDomain
 		procedure,public :: importMesh => ImportMeshFEMDomain
 		procedure,public :: importMaterials => ImportMaterialsFEMDomain
 		procedure,public :: importBoundaries => ImportBoundariesFEMDomain
@@ -181,6 +188,7 @@ module FEMDomainClass
 		procedure,public :: nd => ndFEMDomain
 		procedure,public :: ne => neFEMDomain
 		procedure,public ::	nne => nneFEMDomain
+		procedure,public ::	ngp => ngpFEMDomain
 		procedure,public ::	NodeID => NodeIDFEMDomain
 		
 
@@ -227,11 +235,15 @@ module FEMDomainClass
         procedure,public :: MassVector => MassVectorFEMDomain
 		procedure,public :: Bmatrix => BMatrixFEMDomain
 		procedure,public :: Dmatrix => DMatrixFEMDomain
+		procedure,public :: StrainMatrix => StrainMatrixFEMDomain
+		procedure,public :: StressMatrix => StressMatrixFEMDomain
+		
 		procedure,public :: StiffnessMatrix => StiffnessMatrixFEMDomain 
 		procedure,public :: DiffusionMatrix => DiffusionMatrixFEMDomain 
 		procedure,public :: ConnectMatrix => ConnectMatrixFEMDomain 
 		procedure,public :: ElementVector => ElementVectorFEMDomain 
 		procedure,public :: GlobalVector => GlobalVectorFEMDomain
+
     end type FEMDomain_
 
 	!type:: FEMDomainp_
@@ -275,6 +287,19 @@ subroutine openFEMDomain(obj,path,name)
 	character(200) :: pathi
 	type(IO_) :: f
 	integer(int32) :: n
+
+
+	if(index(path,".vtk")/=0 )then
+		call obj%ImportVTKFile(name=trim(path))
+		return
+	endif
+
+	if(present(name) )then
+		if(index(name,".vtk")/=0 )then
+			call obj%ImportVTKFile(name=trim(path)//"/"//trim(name))
+			return
+		endif
+	endif
 
 	! remove and initialze
 	call obj%remove()
@@ -488,36 +513,6 @@ function divideFEMDomain(obj,n) result(FEMDomains)
 	enddo
 
 end function divideFEMDomain
-!##################################################
-
-!##################################################
-subroutine distributeFEMDomain(obj,mpid) 
-	class(FEMDomain_),intent(inout)::obj
-    type(Mesh_),allocatable :: meshes(:)
-	type(MPI_),intent(inout) :: mpid
-	integer(int32) :: n
-	
-	n=mpid%petot
-
-	! split obj into n objects
-	!if(allocated(obj%FEMDomains) )then
-	!	deallocate(obj%FEMDomains)
-	!endif
-	!allocate(obj%FEMDomains(n))
-
-	! Greedy algorithm
-	if(obj%Mesh%empty() .eqv. .true. )then
-		print *, "distributeFEMDomain >> ERROR >> No mesh is imported."
-		stop
-	endif
-	
-	meshes = obj%mesh%divide(n)
-
-	! import mesh
-	call obj%import(Mesh=meshes(mpid%myrank+1))
-
-
-end subroutine distributeFEMDomain
 !##################################################
 
 !##################################################
@@ -910,6 +905,14 @@ subroutine ImportFEMDomain(obj,OptionalFileFormat,OptionalProjectName,FileHandle
 	integer :: fh,i,j,k,NumOfDomain,n,m,DimNum,GpNum,nodenum,matnum, paranum
 	character*70 Msg,name,ch
 	logical,optional,intent(in) :: Boundaries,Materials
+
+	if(present(file) )then
+		if(index(file,".vtk")/=0 )then
+			call obj%ImportVTKFile(name=trim(file))
+			print *, "imported ",trim(file)
+			return
+		endif
+	endif
 
 	if( trim(getext(trim(file)) )=="mesh" )then
 		
@@ -6182,7 +6185,7 @@ end subroutine
 
 ! ##################################################
 subroutine createFEMDomain(obj,meshtype,Name,x_num,y_num,z_num,x_len,y_len,z_len,Le,Lh,Dr,thickness,division,&
-	top,margin,inclineRate,shaperatio,master,slave,x,y,z,dx,dy,dz,coordinate)
+	top,margin,inclineRate,shaperatio,master,slave,x,y,z,dx,dy,dz,coordinate,species,SoyWidthRatio)
 	class(FEMDomain_),intent(inout) :: obj
 	type(FEMDomain_),optional,intent(inout) :: master,slave
 	character(*),intent(in) :: meshtype
@@ -6196,7 +6199,8 @@ subroutine createFEMDomain(obj,meshtype,Name,x_num,y_num,z_num,x_len,y_len,z_len
 	real(real64),optional,intent(in) :: shaperatio ! for 3D leaf
     real(real64),optional,intent(in) :: top,margin,inclineRate ! for 3D Ridge and dam
 	real(real64),optional,intent(in) :: x,y,z,dx,dy,dz,coordinate(:,:)
-	
+	integer(int32),optional,intent(in) :: species
+	real(real64),optional,intent(in) :: SoyWidthRatio
 	integer,dimension(3),parameter :: versions_to_test = [0,1,4]
 
 	! create uuid
@@ -6238,17 +6242,17 @@ subroutine createFEMDomain(obj,meshtype,Name,x_num,y_num,z_num,x_len,y_len,z_len
 		call obj%Mesh%create(meshtype=meshtype,x_num=xnum,y_num=ynum,x_len=xlen,y_len=ylen,Le=Le,&
 			Lh=Lh,Dr=Dr,thickness=zlen,top=top,margin=margin,shaperatio=shaperatio,&
 			master=master%mesh,slave=slave%mesh,x=x,y=y,z=z,dx=dx,dy=dy,dz=dz,&
-			coordinate=coordinate,division=znum)
+			coordinate=coordinate,division=znum,species=species,SoyWidthRatio=SoyWidthRatio)
 	elseif(present(thickness) )then
 		call obj%Mesh%create(meshtype=meshtype,x_num=xnum,y_num=ynum,x_len=xlen,y_len=ylen,Le=Le,&
 			Lh=Lh,Dr=Dr,thickness=thickness,top=top,margin=margin,shaperatio=shaperatio,&
 			master=master%mesh,slave=slave%mesh,x=x,y=y,z=z,dx=dx,dy=dy,dz=dz,&
-			coordinate=coordinate,division=znum)
+			coordinate=coordinate,division=znum,species=species,SoyWidthRatio=SoyWidthRatio)
 	else
 		call obj%Mesh%create(meshtype=meshtype,x_num=xnum,y_num=ynum,x_len=xlen,y_len=ylen,Le=Le,&
 			Lh=Lh,Dr=Dr,top=top,margin=margin,shaperatio=shaperatio,&
 			master=master%mesh,slave=slave%mesh,x=x,y=y,z=z,dx=dx,dy=dy,dz=dz,&
-			coordinate=coordinate,division=znum)
+			coordinate=coordinate,division=znum,species=species,SoyWidthRatio=SoyWidthRatio)
 	endif
 
 !	if(obj%nd()==2 .or. obj%nd()==3)then
@@ -7073,11 +7077,38 @@ subroutine getSurfaceFEMDomain(obj)
 	call obj%mesh%getSurface()
 
 end subroutine
+! ##################################################
 
-function getVolumeFEMDomain(obj,elem) result(ret)
+! ##################################################
+recursive function getVolumeFEMDomain(obj,elem) result(ret)
+	class(FEMDomain_),intent(in) :: obj
+	type(ShapeFunction_) :: sf
+	integer(int32),optional,intent(in) :: elem
+	real(real64) :: ret
+	integer(int32) :: i,j,elemid
+
+	if(present(elem) )then
+		sf%ElemType=obj%Mesh%GetElemType()
+		call SetShapeFuncType(sf)
+		i = elem
+		call GetAllShapeFunc(sf,elem_id=i,nod_coord=obj%Mesh%NodCoord,&
+			elem_nod=obj%Mesh%ElemNod,OptionalGpID=1)
+		ret = sf%detJ*((2.0d0)**obj%nd())
+	else
+		! count all
+		ret = 0.0d0
+		do elemid=1,obj%ne()
+			ret = ret + obj%getVolume(elem=elemid)	
+		enddo
+	endif
+end function
+! ##################################################
+
+! ##################################################
+function getJacobiMatrixFEMDomain(obj,elem) result(ret)
 	class(FEMDomain_),intent(inout) :: obj
 	integer(int32),intent(in) :: elem
-	real(real64) :: ret
+	real(real64),allocatable :: ret(:,:)
 	integer(int32) :: i,j
 
 
@@ -7086,19 +7117,37 @@ function getVolumeFEMDomain(obj,elem) result(ret)
 	i = elem
 	call GetAllShapeFunc(obj%ShapeFunction,elem_id=i,nod_coord=obj%Mesh%NodCoord,&
 		elem_nod=obj%Mesh%ElemNod,OptionalGpID=1)
-	ret = obj%ShapeFunction%detJ
+	ret = obj%ShapeFunction%Jmat
 
 end function
 ! ##################################################
 
 ! ##################################################
-subroutine vtkFEMDomain(obj,name,scalar,vector,ElementType)
+subroutine vtkFEMDomain(obj,name,scalar,vector,tensor,field,ElementType)
 	class(FEMDomain_),intent(inout) :: obj
 	character(*),intent(in) :: name
-	real(real64),optional,intent(in) :: scalar(:),vector(:,:)
+	character(*),optional,intent(in) :: field
+	real(real64),optional,intent(in) :: scalar(:),vector(:,:),tensor(:,:,:)
 	integer(int32),optional,intent(in) :: ElementType
+	character(len=:),allocatable :: point_scalars,point_vectors,point_tensors,cell_scalars,cell_vectors,cell_tensors
 	type(IO_) :: f
-	integer(int32) ::i,dim_num(3),j,VTK_CELL_TYPE,num_node
+	integer(int32) ::i,dim_num(3),j,VTK_CELL_TYPE,num_node,k
+
+	if(present(field) )then
+		point_scalars = trim(field)
+		point_vectors = trim(field)
+		point_tensors = trim(field)
+		cell_scalars = trim(field)
+		cell_vectors = trim(field)
+		cell_tensors = trim(field)
+	else
+		point_scalars = "point_scalars"
+		point_vectors = "point_vectors"
+		point_tensors = "point_tensors"
+		cell_scalars  = "cell_scalars"
+		cell_vectors  = "cell_vectors"
+		cell_tensors  = "cell_tensors"
+	endif
 
 	if(obj%mesh%empty() .eqv. .true.)then
 		print *, "ERROR :: vtkFEMDomain >> obj%mesh%empty() .eqv. .true., nothing exported"
@@ -7114,7 +7163,7 @@ subroutine vtkFEMDomain(obj,name,scalar,vector,ElementType)
 	elseif(obj%nd()==3 .and. obj%nne()==4 )then
 		VTK_CELL_TYPE=10 ! 4-node triangle
 	elseif(obj%nd()==3 .and. obj%nne()==8 )then
-		VTK_CELL_TYPE=12 ! triangle
+		VTK_CELL_TYPE=12 ! 8-node box
 	else
 		print *, "VTKFEMDomain >> ERROR :: Nothing is exported."
 		return
@@ -7181,14 +7230,14 @@ subroutine vtkFEMDomain(obj,name,scalar,vector,ElementType)
 	if(present(scalar) )then
 		if(size(scalar)==obj%nn()  )then
 			call f%write("POINT_DATA "//str(obj%nn() ) )
-			call f%write("SCALARS point_scalars float")
+			call f%write("SCALARS "//trim(point_scalars)//" float")
 			call f%write("LOOKUP_TABLE default")
 			do i=1,obj%nn()
 				call f%write(str(scalar(i)))
 			enddo
 		elseif(size(scalar)==obj%ne()  )then
 			call f%write("CELL_DATA "//str(obj%ne() ) )
-			call f%write("SCALARS cell_scalars float")
+			call f%write("SCALARS "//trim(cell_scalars)//" float")
 			call f%write("LOOKUP_TABLE default")
 			do i=1,obj%ne()
 				call f%write(str(scalar(i)))
@@ -7204,19 +7253,19 @@ subroutine vtkFEMDomain(obj,name,scalar,vector,ElementType)
 	if(present(vector) )then
 		if(size(vector,1)==obj%nn()  )then
 			call f%write("POINT_DATA "//str(obj%nn() ) )
-			call f%write("VECTORS point_vectors float")
+			call f%write("VECTORS "//trim(point_vectors)//" float")
 			do i=1,obj%nn()
 				do j=1,size(vector,2)-1
-					write(f%fh,'(A)',advance="no") str(vector(i,j) )
+					write(f%fh,'(A)',advance="no") str(vector(i,j) )//" "
 				enddo
 				write(f%fh,'(A)',advance="yes") str(vector(i, size(vector,2) ) )
 			enddo
 		elseif(size(vector,1)==obj%ne()  )then
 			call f%write("CELL_DATA "//str(obj%ne() ) )
-			call f%write("VECTORS cell_vectors float")
+			call f%write("VECTORS "//trim(cell_vectors)//" float")
 			do i=1,obj%ne()
 				do j=1,size(vector,2)-1
-					write(f%fh,'(A)',advance="no") str(vector(i,j) )
+					write(f%fh,'(A)',advance="no") str(vector(i,j) )//" "
 				enddo
 				write(f%fh,'(A)',advance="yes") str(vector(i, size(vector,2) ) )
 			enddo
@@ -7229,28 +7278,46 @@ subroutine vtkFEMDomain(obj,name,scalar,vector,ElementType)
 	endif	
 
 
-	call f%close()
-	return
 
-	!call f%open(trim(name)//".vtk")
-	!call f%write("# vtk DataFile Version 4.1")
-	!call f%write("vtk output")
-	!call f%write("ASCII")
-	!call f%write("DATASET UNSTRUCTURED_GRID")
-	!write(f%fh,*) "POINTS "//trim(str(size(obj%mesh%nodcoord,1)))//" double"
-	!do i=1,size(obj%mesh%nodcoord,1)
-	!	write(f%fh,*) obj%mesh%nodcoord(i,:)
-	!enddo
-	!write(f%fh,*) "CELLS "//trim(str( size(obj%mesh%ElemNod,1)  ) )//&
-	!	" "//trim(str(size(obj%mesh%ElemNod,1)*(size(obj%mesh%ElemNod,2)+1)   ) )
-	!do i=1,size(obj%mesh%ElemNod,1)
-	!	write(f%fh,*) size(obj%mesh%ElemNod,2) , obj%mesh%ElemNod(i,:)-1
-	!enddo
-	!write(f%fh,*) "CELL_TYPES ",size(obj%mesh%ElemNod,1)
-	!do i=1,size(obj%mesh%ElemNod,1)
-	!	write(f%fh,*) "12"
-	!enddo
-	!call f%close()
+	if(present(tensor) )then
+		if(size(tensor,1)==obj%nn()  )then
+			call f%write("POINT_DATA "//str(obj%nn() ) )
+			call f%write("TENSORS "//trim(point_tensors)//" float")
+			do i=1,obj%nn()
+				do j=1,size(tensor,2)
+					do k=1,size(tensor,3)-1
+						write(f%fh,'(A)',advance="no") str(tensor(i,j,k) )//" "
+					enddo
+					write(f%fh,'(A)',advance="yes") str(tensor(i, j,size(tensor,3) ) )
+				enddo
+				
+			enddo
+		elseif(size(tensor,1)==obj%ne()  )then
+			call f%write("CELL_DATA "//str(obj%ne() ) )
+			call f%write("TENSORS "//trim(cell_tensors)//" float")
+			do i=1,obj%ne()
+				do j=1,size(tensor,2)
+					do k=1,size(tensor,3)-1
+						write(f%fh,'(A)',advance="no") str(tensor(i,j,k) )//" "
+					enddo
+					write(f%fh,'(A)',advance="yes") str(tensor(i, j,size(tensor,3) ) )
+				!do j=1,size(tensor,2)-1
+				!	write(f%fh,'(A)',advance="no") str(tensor(i,j) )//" "
+				!enddo
+				!write(f%fh,'(A)',advance="yes") str(tensor(i, size(tensor,2) ) )
+				enddo
+			enddo
+		else
+			call print("vtkFEMDOmain ERROR ::size(tensor,1) sould be obj%nn()   ")
+			call print("size(tensor,1)="//str(size(tensor,1))//" and obj%nn() = "//str(obj%nn() ) )
+			call f%close()
+			return
+		endif
+	endif	
+
+	print *, trim(name)//".vtk is exported." 
+
+	call f%close()
 
 end subroutine
 ! ##################################################
@@ -7381,6 +7448,10 @@ subroutine readFEMDomain(obj,name,DimNum,ElementType)
 	integer(int32) :: num_dim, num_c_node,nne,node_id
 	type(IO_) :: f
 
+	if(index(name,".vtk")/=0 )then
+		call obj%ImportVTKFile(name=trim(name))
+		return
+	endif
 	
 	if(index(name,"json")/=0 )then
 		call f%open(trim(name) )
@@ -7658,7 +7729,7 @@ subroutine addLayerFEMDomain(obj,name,attribute,datastyle,vectorrank,tensorrank1
 	character(*),intent(in) :: datastyle ! should be SCALAR, VECTOR, or TENSOR
 	character(*),intent(in) :: name
 	integer,optional,intent(in) :: vectorrank,tensorrank1,tensorrank2
-	integer(int32) :: datasize, datadimension,vector_rank,tensor_rank1,tensor_rank2
+	integer(int32) :: datasize, datadimension,vector_rank,tensor_rank1,tensor_rank2,i
 
 
 	vector_rank = input(default=3,option=vectorrank)
@@ -7675,6 +7746,9 @@ subroutine addLayerFEMDomain(obj,name,attribute,datastyle,vectorrank,tensorrank1
 		pfa = obj%PhysicalField
 		deallocate(obj%PhysicalField)
 		allocate(obj%PhysicalField(size(pfa)*100 ) )
+		do i=1,size(obj%physicalfield)
+		obj%PhysicalField(i)%name = "untitled"
+		enddo
 		obj%PhysicalField(1:size(pfa))=pfa(:)
 	endif
 
@@ -7730,7 +7804,7 @@ subroutine addLayerFEMDomainScalar(obj,name,scalar)
 	type(PhysicalField_),allocatable :: pfa(:)
 	real(real64),intent(in) :: scalar(:)
 	character(*),intent(in) :: name
-	integer(int32) :: datasize
+	integer(int32) :: datasize,i
 
 
 	if(.not.allocated(obj % PhysicalField) ) then
@@ -7743,6 +7817,9 @@ subroutine addLayerFEMDomainScalar(obj,name,scalar)
 		pfa = obj%PhysicalField
 		deallocate(obj%PhysicalField)
 		allocate(obj%PhysicalField(size(pfa)*100 ) )
+		do i=1,size(obj%physicalfield)
+		obj%PhysicalField(i)%name = "untitled"
+		enddo
 		obj%PhysicalField(1:size(pfa))=pfa(:)
 	endif
 
@@ -7784,7 +7861,7 @@ subroutine addLayerFEMDomainVector(obj,name,vector)
 	type(PhysicalField_),allocatable :: pfa(:)
 	real(real64),intent(in) :: vector(:,:)
 	character(*),intent(in) :: name
-	integer(int32) :: datasize,datadimension
+	integer(int32) :: datasize,datadimension,i
 
 
 	if(.not.allocated(obj % PhysicalField) ) then
@@ -7797,6 +7874,9 @@ subroutine addLayerFEMDomainVector(obj,name,vector)
 		pfa = obj%PhysicalField
 		deallocate(obj%PhysicalField)
 		allocate(obj%PhysicalField(size(pfa)*100 ) )
+		do i=1,size(obj%physicalfield)
+		obj%PhysicalField(i)%name = "untitled"
+		enddo
 		obj%PhysicalField(1:size(pfa))=pfa(:)
 	endif
 
@@ -7836,7 +7916,7 @@ subroutine addLayerFEMDomaintensor(obj,name,tensor)
 	type(PhysicalField_),allocatable :: pfa(:)
 	real(real64),intent(in) :: tensor(:,:,:)
 	character(*),intent(in) :: name
-	integer(int32) :: datasize,datadimension
+	integer(int32) :: datasize,datadimension,i
 
 
 	if(.not.allocated(obj % PhysicalField) ) then
@@ -7849,6 +7929,9 @@ subroutine addLayerFEMDomaintensor(obj,name,tensor)
 		pfa = obj%PhysicalField
 		deallocate(obj%PhysicalField)
 		allocate(obj%PhysicalField(size(pfa)*100 ) )
+		do i=1,size(obj%physicalfield)
+		obj%PhysicalField(i)%name = "untitled"
+		enddo
 		obj%PhysicalField(1:size(pfa))=pfa(:)
 	endif
 
@@ -8027,12 +8110,12 @@ end function
 
 
 ! ######################################################################
-subroutine projectionFEMDomain(obj,direction,domain,PhysicalField,debug,mpid)
+subroutine projectionFEMDomain(obj,direction,domain,PhysicalField,debug)
 	class(FEMDomain_),intent(inout) :: obj
 	character(2),intent(in) :: direction ! "=>, <=, -> or <-"
 	type(FEMDomain_),intent(inout) :: domain
 	type(ShapeFunction_) :: shapefunc
-	type(MPI_),optional,intent(inout) :: mpid
+	!type(MPI_),optional,intent(inout) :: mpid
 	character(*),intent(in) :: PhysicalField
 	logical,optional,intent(in) :: debug
 	logical :: inside
@@ -8134,11 +8217,11 @@ subroutine projectionFEMDomain(obj,direction,domain,PhysicalField,debug,mpid)
 				! for mpi acceralation
 				start_id=1
 				end_id=size(domain%mesh%nodcoord,1)
-				if(present(mpid) )then
-					call mpid%initItr(end_id)
-					start_id = mpid%start_id
-					end_id = mpid%end_id
-				endif
+!				if(present(mpid) )then
+!					call mpid%initItr(end_id)
+!					start_id = mpid%start_id
+!					end_id = mpid%end_id
+!				endif
 
 				do i=start_id, end_id ! for each node
 					do j=1, size(obj%mesh%elemnod,1) ! for each element
@@ -8215,24 +8298,24 @@ subroutine projectionFEMDomain(obj,direction,domain,PhysicalField,debug,mpid)
 				enddo
 
 				! for mpi acceralation
-				! merge data
-				if(present(mpid) )then
-					call mpid%Barrier()
-					do i=1,size(ElemID)
-						n =ElemID(i)
-						from_rank = mpid%start_end_id(i)-1
-						call mpid%Bcast(From=from_rank,val=n)
-						ElemID(i)=n
-
-
-						do j=1,size(LocalCoord,2)
-							val = LocalCoord(i,j)
-							call mpid%Bcast(From=from_rank,val=val)
-							LocalCoord(i,j)=val
-						enddo
-					enddo
-				endif
-
+!				! merge data
+!				if(present(mpid) )then
+!					call mpid%Barrier()
+!					do i=1,size(ElemID)
+!						n =ElemID(i)
+!						from_rank = mpid%start_end_id(i)-1
+!						call mpid%Bcast(From=from_rank,val=n)
+!						ElemID(i)=n
+!
+!
+!						do j=1,size(LocalCoord,2)
+!							val = LocalCoord(i,j)
+!							call mpid%Bcast(From=from_rank,val=val)
+!							LocalCoord(i,j)=val
+!						enddo
+!					enddo
+!				endif
+!
 				
 				! projection先の節点番号iに対応したprojection元の要素ID:ElemID(i)
 				! projection先の節点番号iに対応したprojection元の要素局所座標:LocalCoord(i,1:3)@3D
@@ -8310,11 +8393,11 @@ subroutine projectionFEMDomain(obj,direction,domain,PhysicalField,debug,mpid)
 				! for mpi acceralation
 				start_id=1
 				end_id=size(obj%mesh%nodcoord,1)
-				if(present(mpid) )then
-					call mpid%initItr(end_id)
-					start_id = mpid%start_id
-					end_id = mpid%end_id
-				endif
+!				if(present(mpid) )then
+!					call mpid%initItr(end_id)
+!					start_id = mpid%start_id
+!					end_id = mpid%end_id
+!				endif
 
 				do i=start_id, end_id ! for each node
 					do j=1, size(domain%mesh%elemnod,1) ! for each element
@@ -8392,23 +8475,23 @@ subroutine projectionFEMDomain(obj,direction,domain,PhysicalField,debug,mpid)
 
 				! for mpi acceralation
 				! merge data
-				if(present(mpid) )then
-					call mpid%Barrier()
-					do i=1,size(ElemID)
-						n =ElemID(i)
-						from_rank = mpid%start_end_id(i)-1
-						call mpid%Bcast(From=from_rank,val=n)
-						ElemID(i)=n
-
-
-						do j=1,size(LocalCoord,2)
-							val = LocalCoord(i,j)
-							call mpid%Bcast(From=from_rank,val=val)
-							LocalCoord(i,j)=val
-						enddo
-					enddo
-				endif
-
+!				if(present(mpid) )then
+!					call mpid%Barrier()
+!					do i=1,size(ElemID)
+!						n =ElemID(i)
+!						from_rank = mpid%start_end_id(i)-1
+!						call mpid%Bcast(From=from_rank,val=n)
+!						ElemID(i)=n
+!
+!
+!						do j=1,size(LocalCoord,2)
+!							val = LocalCoord(i,j)
+!							call mpid%Bcast(From=from_rank,val=val)
+!							LocalCoord(i,j)=val
+!						enddo
+!					enddo
+!				endif
+!
 				
 				! projection先の節点番号iに対応したprojection元の要素ID:ElemID(i)
 				! projection先の節点番号iに対応したprojection元の要素局所座標:LocalCoord(i,1:3)@3D
@@ -8473,6 +8556,45 @@ subroutine projectionFEMDomain(obj,direction,domain,PhysicalField,debug,mpid)
 	endif
 
 end subroutine
+! ######################################################################
+
+
+! ######################################################################
+function centerPositionFEMDomain(obj,ElementID) result(ret)
+	class(FEMDomain_),intent(in) :: obj
+	integer(int32),intent(in) :: ElementID
+	real(real64),allocatable :: ret(:)
+	integer(int32) :: i
+	! get center coordinate of the element 
+
+	ret = zeros(obj%nd() )
+
+	do i=1,obj%nne()
+		ret = ret + obj%mesh%nodcoord( obj%mesh%elemnod(ElementID,i) ,:)
+	enddo
+
+	ret = 1.0d0/dble( obj%nne() )* ret
+
+end function
+! ######################################################################
+
+
+! ######################################################################
+function getGlobalPositionOfGaussPointFEMDomain(obj,ElementID,GaussPointID) result(ret)
+	class(FEMDomain_),intent(inout) :: obj
+	integer(int32),intent(in) :: ElementID,GaussPointID
+	real(real64),allocatable :: ret(:),center(:)
+	integer(int32) :: i
+	type(ShapeFunction_) :: sf
+	! get center coordinate of the element 
+	center = obj%centerPosition(ElementID)
+
+	sf = obj%mesh%getShapeFunction(ElementID,GaussPointID)
+
+	ret = zeros(size(center) )
+	ret(:) = matmul( transpose(sf%elemcoord) , sf%nmat ) + center(:)
+	
+end function
 ! ######################################################################
 
 
@@ -8653,6 +8775,102 @@ function nneFEMDomain(obj) result(ret)
 
 end function
 ! ######################################################################
+
+
+! ######################################################################
+function ngpFEMDomain(obj) result(ret)
+	class(FEMDomain_),intent(inout) :: obj
+	type(ShapeFunction_) :: sf
+	integer(int32) :: ret
+
+	sf = obj%mesh%getShapeFunction(ElementID=1, GaussPointID=1)
+	ret = sf%NumOfGP
+
+!	red = input(default=.false.,option=reduction)
+!
+!	if(obj%nd()==1 )then
+!		if(obj%nne()==2 )then
+!			! 1st order 1-D line element
+!			if(reduction)then
+!				ret = 1
+!			else
+!				ret = 2
+!			endif
+!		elseif(obj%nne()==3 )then
+!			! 2nd order 1-D line element
+!			if(reduction)then
+!				ret = 2
+!			else
+!				ret = 3
+!			endif
+!		else
+!			print *, "ERROR :: ngpFEMDomain >> obj%nne() should be 2 or 3 for 1D"
+!			ret = -1
+!		endif
+!	elseif(obj%nd()==2 )then
+!		if(obj%nne()==3 )then
+!			! 1st order 2-D triangle element
+!			if(reduction)then
+!				ret = 1
+!			else
+!				ret = 3
+!			endif
+!		elseif(obj%nne()==6 )then
+!			! 2nd order 2-D triangle element
+!			if(reduction)then
+!				ret = 3
+!			else
+!				ret = 6
+!			endif
+!		elseif(obj%nne()==4 )then
+!			! 1st order 2-D rectangle element
+!			if(reduction)then
+!				ret = 1
+!			else
+!				ret = 4
+!			endif
+!
+!		elseif(obj%nne()==8 .or. obj%nne()==9 )then
+!			! 2nd order 2-D rectangle element
+!			if(reduction)then
+!				ret = 4
+!			else
+!				ret = 9
+!			endif
+!		else
+!			print *, "ERROR :: ngpFEMDomain >> obj%nne() should be 3, 4, or 9 for 2-D"
+!			ret = -1
+!		endif
+!
+!	elseif(obj%nd()==3 )then
+!
+!		if(obj%nne()==4 )then
+!			! 1st order 3-D tetra element
+!			if(reduction)then
+!				ret = 1
+!			else
+!				ret = 4
+!			endif
+!		elseif(obj%nne()==8 )then
+!			! 1st order 2-D rectangle element
+!			if(reduction)then
+!				ret = 1
+!			else
+!				ret = 8
+!			endif
+!
+!		else
+!			print *, "ERROR :: ngpFEMDomain >> obj%nne() should be 4, 8 for 3-D"
+!			ret = -1
+!		endif
+!	else
+!		print *, "ERROR :: ngpFEMDomain >> obj%nd() should be 1, 2 or 3."
+!		ret = -1
+!	endif
+
+end function
+! ######################################################################
+
 
 subroutine editFEMDomain(obj,x,altitude)
     class(FEMDomain_),intent(inout) :: obj
@@ -8997,6 +9215,253 @@ function DMatrixFEMDomain(obj,E,v) result(Dmat)
 end function
 ! ##########################################################################
 
+
+! ##########################################################################
+function StrainMatrixFEMDomain(obj,ElementID,GaussPoint,disp) result(StrainMatrix)
+	class(FEMDomain_),intent(inout) :: obj
+	type(Shapefunction_) :: shapefunc
+	integer(int32),intent(in) :: ElementID
+	integer(int32),optional,intent(in) :: GaussPoint
+	
+	real(real64),intent(in) :: disp(:,:)
+	real(real64),allocatable :: StrainMatrix(:,:),Bmat(:,:),Dmat(:,:),ElemDisp(:),Strainvec(:)
+	real(real64) :: rho
+	integer(int32) :: node_DOF,i,j,n,ns
+
+	! 線形弾性微小ひずみにおける要素剛性マトリクス
+	! For Element ID = ElementID, create Stiffness Matrix 
+	! in terms of small-strain and return it
+	! Number of Gauss Point = number of node per element, as default.
+	
+	node_DOF = obj%nd() ! Degree of freedom/node = dimension of space
+
+	! For Element ID = ElementID, create Mass Matrix and return it
+	! Number of Gauss Point = number of node per element, as default.
+
+	! initialize shape-function object
+	call shapefunc%SetType(NumOfDim=obj%nd(),NumOfNodePerElem=obj%nne() )
+	
+	ElemDisp = zeros(  size( obj%mesh%elemnod,2 ) *node_DOF) 
+	do i=1,obj%nne()
+		do j=1,node_DOF
+			ElemDisp( node_DOF*(i-1) + j ) = Disp(i,j)
+		enddo
+	enddo
+
+	if(present(gausspoint) )then
+		call getAllShapeFunc(shapefunc,elem_id=ElementID,&
+		nod_coord=obj%Mesh%NodCoord,&
+		elem_nod=obj%Mesh%ElemNod,OptionalGpID=gausspoint)
+	
+		n=size(shapefunc%dNdgzi,2)*node_DOF
+
+		ns = node_DOF ! For 3D, 3-by-3 matrix.
+		if(.not.allocated(StrainMatrix) ) then
+			allocate(StrainMatrix(ns,ns) )
+			StrainMatrix(:,:)=0.0d0
+		endif
+		if(size(StrainMatrix,1)/=ns .or.size(StrainMatrix,2)/=ns )then
+			if(allocated(StrainMatrix)) then
+				deallocate(StrainMatrix)
+			endif
+			allocate(StrainMatrix(ns,ns) )
+		endif
+
+		! get so-called B-matrix
+		Bmat = obj%Bmatrix(shapefunc)
+		
+		strainvec = matmul(Bmat,ElemDisp)
+
+		if(node_DOF==3)then
+			strainMatrix(1,1) = strainMatrix(1,1)+strainvec(1)
+			strainMatrix(2,2) = strainMatrix(2,2)+strainvec(2)
+			strainMatrix(3,3) = strainMatrix(3,3)+strainvec(3)
+			strainMatrix(1,2) = strainMatrix(1,2)+strainvec(4)
+			strainMatrix(2,3) = strainMatrix(2,3)+strainvec(5)
+			strainMatrix(1,3) = strainMatrix(1,3)+strainvec(6)
+			strainMatrix(2,1) = strainMatrix(2,1)+strainvec(4)
+			strainMatrix(3,2) = strainMatrix(3,2)+strainvec(5)
+			strainMatrix(3,1) = strainMatrix(3,1)+strainvec(6)
+		elseif(node_DOF == 2)then
+			strainMatrix(1,1) = strainMatrix(1,1) + strainvec(1)
+			strainMatrix(2,2) = strainMatrix(2,2) + strainvec(2)
+			strainMatrix(1,2) = strainMatrix(1,2) + strainvec(3)
+			strainMatrix(2,1) = strainMatrix(2,1) + strainvec(3)
+		else
+			print *, "ERROR :: StrainMatrixFEMDomain >> invalid nodeal DOF",node_DOF
+		endif
+	else
+		do i=1, shapefunc%NumOfGp
+			call getAllShapeFunc(shapefunc,elem_id=ElementID,&
+			nod_coord=obj%Mesh%NodCoord,&
+			elem_nod=obj%Mesh%ElemNod,OptionalGpID=i)
+		
+			n=size(shapefunc%dNdgzi,2)*node_DOF
+	
+			ns = node_DOF ! For 3D, 3-by-3 matrix.
+			if(.not.allocated(StrainMatrix) ) then
+				allocate(StrainMatrix(ns,ns) )
+				StrainMatrix(:,:)=0.0d0
+			endif
+			if(size(StrainMatrix,1)/=ns .or.size(StrainMatrix,2)/=ns )then
+				if(allocated(StrainMatrix)) then
+					deallocate(StrainMatrix)
+				endif
+				allocate(StrainMatrix(ns,ns) )
+			endif
+	
+			! get so-called B-matrix
+			Bmat = obj%Bmatrix(shapefunc)
+			
+			strainvec = matmul(Bmat,ElemDisp)
+			if(node_DOF==3)then
+				strainMatrix(1,1) = strainMatrix(1,1)+strainvec(1)
+				strainMatrix(2,2) = strainMatrix(2,2)+strainvec(2)
+				strainMatrix(3,3) = strainMatrix(3,3)+strainvec(3)
+				strainMatrix(1,2) = strainMatrix(1,2)+strainvec(4)
+				strainMatrix(2,3) = strainMatrix(2,3)+strainvec(5)
+				strainMatrix(1,3) = strainMatrix(1,3)+strainvec(6)
+				strainMatrix(2,1) = strainMatrix(2,1)+strainvec(4)
+				strainMatrix(3,2) = strainMatrix(3,2)+strainvec(5)
+				strainMatrix(3,1) = strainMatrix(3,1)+strainvec(6)
+			elseif(node_DOF == 2)then
+				strainMatrix(1,1) = strainMatrix(1,1) + strainvec(1)
+				strainMatrix(2,2) = strainMatrix(2,2) + strainvec(2)
+				strainMatrix(1,2) = strainMatrix(1,2) + strainvec(3)
+				strainMatrix(2,1) = strainMatrix(2,1) + strainvec(3)
+			else
+				print *, "ERROR :: StrainMatrixFEMDomain >> invalid nodeal DOF",node_DOF
+			endif
+			
+		enddo	
+	endif
+end function
+! ##########################################################################
+
+
+! ##########################################################################
+function StressMatrixFEMDomain(obj,ElementID,GaussPoint,disp,E,v) result(StressMatrix)
+	class(FEMDomain_),intent(inout) :: obj
+	type(Shapefunction_) :: shapefunc
+	integer(int32),intent(in) :: ElementID
+	integer(int32),optional,intent(in) :: GaussPoint
+	
+	real(real64),intent(in) :: disp(:,:),E,v
+	real(real64),allocatable :: StressMatrix(:,:),Bmat(:,:),Dmat(:,:),ElemDisp(:),Stressvec(:)
+	real(real64) :: rho
+	integer(int32) :: node_DOF,i,j,n,ns
+
+
+	! 線形弾性微小ひずみにおける要素剛性マトリクス
+	! For Element ID = ElementID, create Stiffness Matrix 
+	! in terms of small-strain and return it
+	! Number of Gauss Point = number of node per element, as default.
+	
+	node_DOF = obj%nd() ! Degree of freedom/node = dimension of space
+
+	! For Element ID = ElementID, create Mass Matrix and return it
+	! Number of Gauss Point = number of node per element, as default.
+
+	! initialize shape-function object
+	call shapefunc%SetType(NumOfDim=obj%nd(),NumOfNodePerElem=obj%nne() )
+	
+	ElemDisp = zeros(  size( obj%mesh%elemnod,2 ) *node_DOF) 
+	do i=1,obj%nne()
+		do j=1,node_DOF
+			ElemDisp( node_DOF*(i-1) + j ) = Disp(i,j)
+		enddo
+	enddo
+
+	if(present(gausspoint) )then
+		call getAllShapeFunc(shapefunc,elem_id=ElementID,&
+		nod_coord=obj%Mesh%NodCoord,&
+		elem_nod=obj%Mesh%ElemNod,OptionalGpID=gausspoint)
+	
+		n=size(shapefunc%dNdgzi,2)*node_DOF
+
+		ns = node_DOF ! For 3D, 3-by-3 matrix.
+		if(.not.allocated(StressMatrix) ) then
+			allocate(StressMatrix(ns,ns) )
+			StressMatrix(:,:)=0.0d0
+		endif
+		if(size(StressMatrix,1)/=ns .or.size(StressMatrix,2)/=ns )then
+			if(allocated(StressMatrix)) then
+				deallocate(StressMatrix)
+			endif
+			allocate(StressMatrix(ns,ns) )
+		endif
+
+		! get so-called B-matrix
+		Dmat = obj%Dmatrix(E,v)
+		Bmat = obj%Bmatrix(shapefunc)
+		
+		Stressvec = matmul(Dmat,matmul(Bmat,ElemDisp))
+		if(node_DOF==3)then
+			StressMatrix(1,1) = StressMatrix(1,1)+Stressvec(1)
+			StressMatrix(2,2) = StressMatrix(2,2)+Stressvec(2)
+			StressMatrix(3,3) = StressMatrix(3,3)+Stressvec(3)
+			StressMatrix(1,2) = StressMatrix(1,2)+Stressvec(4)
+			StressMatrix(2,3) = StressMatrix(2,3)+Stressvec(5)
+			StressMatrix(1,3) = StressMatrix(1,3)+Stressvec(6)
+			StressMatrix(2,1) = StressMatrix(2,1)+Stressvec(4)
+			StressMatrix(3,2) = StressMatrix(3,2)+Stressvec(5)
+			StressMatrix(3,1) = StressMatrix(3,1)+Stressvec(6)
+		elseif(node_DOF == 2)then
+			StressMatrix(1,1) = StressMatrix(1,1) + Stressvec(1)
+			StressMatrix(2,2) = StressMatrix(2,2) + Stressvec(2)
+			StressMatrix(1,2) = StressMatrix(1,2) + Stressvec(3)
+			StressMatrix(2,1) = StressMatrix(2,1) + Stressvec(3)
+		else
+			print *, "ERROR :: StressMatrixFEMDomain >> invalid nodeal DOF",node_DOF
+		endif
+	else
+		do i=1, shapefunc%NumOfGp
+			call getAllShapeFunc(shapefunc,elem_id=ElementID,&
+			nod_coord=obj%Mesh%NodCoord,&
+			elem_nod=obj%Mesh%ElemNod,OptionalGpID=i)
+		
+			n=size(shapefunc%dNdgzi,2)*node_DOF
+	
+			ns = node_DOF ! For 3D, 3-by-3 matrix.
+			if(.not.allocated(StressMatrix) ) then
+				allocate(StressMatrix(ns,ns) )
+				StressMatrix(:,:)=0.0d0
+			endif
+			if(size(StressMatrix,1)/=ns .or.size(StressMatrix,2)/=ns )then
+				if(allocated(StressMatrix)) then
+					deallocate(StressMatrix)
+				endif
+				allocate(StressMatrix(ns,ns) )
+			endif
+	
+			! get so-called B-matrix
+			Bmat = obj%Bmatrix(shapefunc)
+			
+			Stressvec = matmul(Bmat,ElemDisp)
+			if(node_DOF==3)then
+				StressMatrix(1,1) = StressMatrix(1,1)+Stressvec(1)
+				StressMatrix(2,2) = StressMatrix(2,2)+Stressvec(2)
+				StressMatrix(3,3) = StressMatrix(3,3)+Stressvec(3)
+				StressMatrix(1,2) = StressMatrix(1,2)+Stressvec(4)
+				StressMatrix(2,3) = StressMatrix(2,3)+Stressvec(5)
+				StressMatrix(1,3) = StressMatrix(1,3)+Stressvec(6)
+				StressMatrix(2,1) = StressMatrix(2,1)+Stressvec(4)
+				StressMatrix(3,2) = StressMatrix(3,2)+Stressvec(5)
+				StressMatrix(3,1) = StressMatrix(3,1)+Stressvec(6)
+			elseif(node_DOF == 2)then
+				StressMatrix(1,1) = StressMatrix(1,1) + Stressvec(1)
+				StressMatrix(2,2) = StressMatrix(2,2) + Stressvec(2)
+				StressMatrix(1,2) = StressMatrix(1,2) + Stressvec(3)
+				StressMatrix(2,1) = StressMatrix(2,1) + Stressvec(3)
+			else
+				print *, "ERROR :: StressMatrixFEMDomain >> invalid nodeal DOF",node_DOF
+			endif
+			
+		enddo	
+	endif
+
+end function
+! ##########################################################################
 
 ! ##########################################################################
 recursive function BMatrixFEMDomain(obj,shapefunction,ElementID) result(Bmat)
@@ -9353,8 +9818,12 @@ function selectFEMDomain(obj,x_min,x_max,y_min,y_max,z_min,z_max) result(NodeLis
 			n=n+1
 		endif
 	enddo
+	
 
 	NodeList = int(zeros(n)  )
+	
+	if(n==0) return
+
 	n=0
 	do i=1,size(CheckList)
 		if(CheckList(i)==1 )then
@@ -9426,40 +9895,428 @@ end subroutine
 
 
 ! ###################################################################
-function ConnectMatrixFEMDomain(obj,position,DOF) result(connectMatrix)
+function ConnectMatrixFEMDomain(obj,position,DOF,shapefunction) result(connectMatrix)
 	class(FEMDomain_),intent(inout) :: obj
+	type(ShapeFunction_),optional,intent(in) :: shapefunction
 	type(ShapeFunction_) :: sobj
 	real(real64),intent(in) :: position(:)
 	integer(int32),intent(in) :: DOF
 	real(real64),allocatable :: connectMatrix(:,:),cm_DOF1(:,:),Rcvec(:),Bc(:,:)
 	integer(int32) :: i,j,n
 
-	sobj = obj%getShapeFunction(position=position)
-
-	n = (obj%nne()+1) * DOF
 	
-	if(sobj%elementid == -1)then
-		! no contact
-		connectMatrix = zeros(n,n)
+	if(present(shapefunction) )then
+		! Gauss-Point Projection
+		sobj = obj%getShapeFunction(position=position)
+		n = (obj%nne()+size(shapefunction%nmat,1) ) * DOF
+		
+		if(sobj%elementid == -1)then
+			! no contact
+			connectMatrix = zeros(n,n)
+			return
+		endif
+		
+		Bc = zeros(DOF, n)
+
+		!do i=1,DOF
+		!	BC(i,i) = 1.0d0
+		!enddo
+
+		allocate(Rcvec(n) )
+		! <    Domain #1    > <    Domain #2    >
+		! (N1 0  0 N2 0  0 ... N1 0  0 N2 0  0 ...   )
+		! (0  N1 0 0  N2 0 ... 0  N1 0 0  N2 0 ...   )
+		! (0  0 N1 0  0 N2 ... 0  0 N1 0  0 N2 ...   )
+
+		! \epsilon \int_{x_e} Bc^T Bc detJ d x_e = 0
+		do i=1,size(shapefunction%nmat)
+			do j=1,DOF
+				Bc(j, (i-1)*DOF + j ) = shapefunction%nmat(i)
+			enddo
+		enddo
+		do i=1,size(sobj%nmat)
+			do j=1,DOF
+				Bc(j, size(shapefunction%nmat)*DOF + (i-1)*DOF + j ) = - sobj%nmat(i)
+			enddo
+		enddo
+
+		connectMatrix = matmul( transpose(Bc),Bc  )*shapefunction%detJ
+		return
+	
+	else
+		sobj = obj%getShapeFunction(position=position)
+		n = (obj%nne()+1) * DOF
+		
+		if(sobj%elementid == -1)then
+			! no contact
+			connectMatrix = zeros(n,n)
+			return
+		endif
+	
+		n = (size(sobj%nmat)+1) * DOF
+		Bc = zeros(DOF, n)
+		do i=1,DOF
+			BC(i,i) = 1.0d0
+		enddo
+		allocate(Rcvec(n) )
+		Rcvec(1:DOF) = 1.0d0
+		do i=1,size(sobj%nmat)
+			do j=1,DOF
+				Rcvec(DOF+ (i-1)*DOF + j) = - sobj%nmat(i)
+				Bc(j, i*DOF + j ) = - sobj%nmat(i)
+			enddo
+		enddo
+		connectMatrix = matmul( transpose(Bc),Bc  )
 		return
 	endif
-
-	n = (size(sobj%nmat)+1) * DOF
-	Bc = zeros(DOF, n)
-	do i=1,DOF
-		BC(i,i) = 1.0d0
-	enddo
-	allocate(Rcvec(n) )
-	Rcvec(1:DOF) = 1.0d0
-	do i=1,size(sobj%nmat)
-		do j=1,DOF
-			Rcvec(DOF+ (i-1)*DOF + j) = - sobj%nmat(i)
-			Bc(j, i*DOF + j ) = - sobj%nmat(i)
-		enddo
-	enddo
-	connectMatrix = matmul( transpose(Bc),Bc  )
 	
 end function
+! ##################################################################
+
+
+! ##################################################################
+subroutine ImportVTKFileFEMDomain(obj,name)
+	class(FEMDomain_),intent(inout) :: Obj
+	character(*),intent(in) :: name
+	type(IO_) :: f
+	character(len=:),allocatable :: fullname, line,fieldname
+	integer(int32) :: i,j,k,n,from,to,m,numnode,numline,POINT_DATA
+	integer(int32),allocatable :: CELLS(:),CELL_TYPES(:)
+	logical :: ASCII=.false.
+	logical :: UNSTRUCTURED_GRID=.false.
+
+	! Only for POINTS, CELLS, CELL_TYPES, VECTORS, TENSORS, SCALARS
+	
+	call obj%remove()
+
+	if( index(name,".vtk")==0 .and. index(name,".VTK")==0 )then
+		fullname = trim(name)//".vtk"
+	else
+		fullname = trim(name)
+	endif
+
+	call f%open(fullname)
+	
+	! read settings
+	do
+		if(f%EOF) exit
+		line = f%readline()
+		line = adjustl(line)
+		if(index( line(1:1),"#") /=0 )cycle
+		
+		if(index( line,"ASCII") /=0 )then
+			ASCII = .true.
+			cycle
+		endif
+
+		if(index( line,"DATASET") /=0 )then
+			if( index( line,"UNSTRUCTURED_GRID") /=0 )then
+				UNSTRUCTURED_GRID = .true.
+			endif
+			cycle
+		endif
+		if(index( line,"POINTS") /=0  )then
+			exit
+		endif
+
+		if(index( line,"CELLS") /=0 .or. index( line,"cells") /=0  )then
+			exit
+		endif
+
+		if(index( line,"VECTOR") /=0 .or. index( line,"vector") /=0  )then
+			exit
+		endif
+
+		if(index( line,"TENSOR") /=0 .or. index( line,"tensor") /=0  )then
+			exit
+		endif
+
+		if(index( line,"SCALAR") /=0 .or. index( line,"scalar") /=0  )then
+			exit
+		endif
+	enddo
+
+	! check vtk file
+	if(ASCII)then
+		print *, "[ok] ASCII format."
+	else
+		print *, "ERROR :: importVTKFile >> here, vtk file should be ASCII format."
+		stop
+	endif
+	
+	if(UNSTRUCTURED_GRID)then
+		print *, "[ok] UNSTRUCTURED_GRID"
+	else
+		print *, "ERROR :: importVTKFile >> here, DATASET should be UNSTRUCTURED_GRID"
+		stop
+	endif
+	
+	if(f%EOF)then
+		print *,"ERROR ;; importVTKFile >> no readable found in the file!"
+		stop
+	endif
+
+	do
+		if(f%EOF)exit
+		if(index( line,"POINTS") /=0  )then
+			from = index( line,"POINTS") + 6
+			read( line(from:),* ) n
+			allocate(obj%mesh%nodcoord(n,3) )
+			do i=1,n
+				line = f%readline()
+				read(line,*) obj%mesh%nodcoord(i,:)
+			enddo
+		endif
+
+		if(index( line,"CELLS") /=0  )then
+			from = index( line,"CELLS") + 5
+			read( line(from:),* ) n, m
+			allocate(CELLS(m) )
+			numline=0
+			do i=1,n
+				line = f%readline()
+				read(line,*) numnode
+				read(line,*) CELLS(numline+1:numline+numnode+1)
+				CELLS(numline+2:numline+numnode+1) = CELLS(numline+2:numline+numnode+1)+1
+				numline = numline + numnode + 1
+			enddo
+		endif
+
+		if(index( line,"CELL_TYPES") /=0  )then
+			from = index( line,"CELL_TYPES") + 10
+			read( line(from:),* ) n
+			if(.not.allocated(CELLS) )then
+				print *, "ERROR :: importVTKFile >> no CELLS are found before CELL_TYPES."
+				stop
+			endif
+			allocate(CELL_TYPES(n) )
+			do i=1,n
+				line = f%readline()
+				read(line,*) CELL_TYPES(i)
+			enddo
+
+			! cannot use mixed mesh for PlantFEM
+
+			if(maxval(CELL_TYPES)/=minval(CELL_TYPES) )then
+				print *, "[Caution] :: importVTKFile >> cannot use mixed mesh for PlantFEM"
+				print *, "Only CELL_TYPES = ",maxval(CELL_TYPES),"will be imported."
+				n = 0
+				do i=1,size(CELL_TYPES)
+					if(CELL_TYPES(i)==maxval(CELL_TYPES) )then
+						n=n+1
+					endif
+				enddo
+			else
+				n = size(CELL_TYPES)
+			endif
+
+			m = maxval(CELL_TYPES)
+			select case(m)
+			case(VTK_VERTEX)
+				numnode=1
+			case(VTK_POLY_VERTEX)
+				numnode=1
+			case(VTK_LINE)
+				numnode=2
+			case(VTK_TRIANGLE)
+				numnode=3
+			case(VTK_PIXEL)
+				numnode=4
+			case(VTK_QUAD)
+				numnode=4
+			case(VTK_TETRA)
+				numnode=4
+			case(VTK_VOXEL)
+				numnode=8
+			case(VTK_HEXAHEDRON)
+				numnode=8
+			case(VTK_WEDGE)
+				numnode=6
+			case(VTK_QUADRATIC_EDGE)
+				numnode=3
+			case(VTK_QUADRATIC_TRIANGLE)
+				numnode=6
+			case(VTK_QUADRATIC_QUAD)
+				numnode=8
+			case(VTK_QUADRATIC_TETRA)
+				numnode=10
+			case(VTK_QUADRATIC_HEXAHEDRON)
+				numnode=16
+			
+			end select
+
+
+			allocate(obj%mesh%elemnod(n,numnode) )
+			
+			obj%mesh%elemnod(:,:) = 0
+			n=0
+			do i=1,obj%ne() 
+				do
+					if(n+1 > size(CELLS) ) exit
+					if(CELLS(n+1)==numnode )then
+						obj%mesh%elemnod(i,1:numnode) = CELLS(n+2:n+numnode+1)
+						n=n+1+numnode
+						exit
+					else
+						n=n+1+numnode
+						cycle
+					endif
+				enddo
+			enddo
+
+		endif
+
+		if(index( line,"POINT_DATA") /=0  )then
+			from = index( line,"POINT_DATA") + 10
+			read( line(from:),* ) POINT_DATA
+		endif
+
+		if(index( line,"CELL_DATA") /=0  )then
+			from = index( line,"CELL_DATA") + 10
+			read( line(from:),* ) POINT_DATA
+		endif
+
+
+		if(index( line,"SCALARS") /=0  )then
+			from = index( line,"SCALARS") + 7
+			to = index( line(from+1:)," ")
+			fieldname=trim(adjustl(line(from:to+7)))
+			if(.not.allocated(obj%PhysicalField) )then
+				allocate(obj%PhysicalField(100) )
+				do i=1,size(obj%physicalfield)
+				obj%PhysicalField(i)%name = "untitled"
+				enddo
+			endif
+			do i=1,size(obj%PhysicalField)
+				if(allocated(obj%PhysicalField(i)%scalar ) )then
+					cycle
+				elseif(allocated(obj%PhysicalField(i)%vector ) )then
+					cycle
+				elseif(allocated(obj%PhysicalField(i)%tensor ) )then
+					cycle
+				else
+					allocate(obj%PhysicalField(i)%scalar(POINT_DATA) )
+					obj%PhysicalField(i)%name = trim(fieldname)
+					obj%PhysicalField(i)%scalar(:) = 0.0d0
+					do j=1,POINT_DATA
+						line = f%readline()
+						read(line,*)obj%PhysicalField(i)%scalar(j) 
+					enddo
+				endif
+			enddo
+		endif
+		
+
+		
+		if(index( line,"VECTORS") /=0  )then
+			from = index( line,"VECTORS") + 7
+			to = index( line(from+1:)," ")
+			fieldname=trim(adjustl(line(from:to+7) ))
+			if(.not.allocated(obj%PhysicalField) )then
+				allocate(obj%PhysicalField(100) )
+				do i=1,size(obj%physicalfield)
+				obj%PhysicalField(i)%name = "untitled"
+				enddo
+			endif
+			do i=1,size(obj%PhysicalField)
+				if(allocated(obj%PhysicalField(i)%scalar ) )then
+					cycle
+				elseif(allocated(obj%PhysicalField(i)%vector ) )then
+					cycle
+				elseif(allocated(obj%PhysicalField(i)%tensor ) )then
+					cycle
+				else
+					allocate(obj%PhysicalField(i)%vector(POINT_DATA,3) )
+					obj%PhysicalField(i)%name = trim(fieldname)
+					obj%PhysicalField(i)%vector(:,:) = 0.0d0
+					do j=1,POINT_DATA
+						line = f%readline()
+						read(line,*)obj%PhysicalField(i)%vector(j,:) 
+						
+					enddo
+					exit
+				endif
+			enddo
+		endif
+		
+
+		
+		if(index( line,"TENSORS") /=0  )then
+			from = index( line,"TENSORS") + 7
+			to = index( line(from+1:)," ")
+			fieldname=trim(adjustl(line(from:to+7)))
+			if(.not.allocated(obj%PhysicalField) )then
+				allocate(obj%PhysicalField(100) )
+				do i=1,size(obj%physicalfield)
+				obj%PhysicalField(i)%name = "untitled"
+				enddo
+			endif
+			do i=1,size(obj%PhysicalField)
+				if(allocated(obj%PhysicalField(i)%scalar ) )then
+					cycle
+				elseif(allocated(obj%PhysicalField(i)%vector ) )then
+					cycle
+				elseif(allocated(obj%PhysicalField(i)%tensor ) )then
+					cycle
+				else
+					allocate(obj%PhysicalField(i)%tensor(POINT_DATA,3,3) )
+					obj%PhysicalField(i)%name = trim(fieldname)
+					obj%PhysicalField(i)%tensor(:,:,:) = 0.0d0
+					do j=1,POINT_DATA
+						do k=1,3
+							line = f%readline()
+							read(line,*)obj%PhysicalField(i)%tensor(j,k,:) 
+						enddo
+					enddo
+
+				endif
+				exit
+			enddo
+		endif
+		
+		
+		
+
+		line = f%readline()
+	enddo
+	call f%close()
+
+
+end subroutine
+! ##################################################################
+
+function getElementFEMDOmain(obj,ElementID) result(element)
+	class(FEMDomain_),intent(in) :: obj
+	type(FEMDomain_) :: element
+	integer(int32),intent(in) :: ElementID
+
+	element%mesh = obj%mesh%getelement(ElementID)
+
+end function
+! ##################################################################
+
+! ##################################################################
+subroutine Delaunay3DFEMDomain(obj)
+	class(FEMDomain_),intent(inout) :: obj
+
+	if(.not. allocated(obj%mesh%nodcoord) )then
+		print *, "ERROR :: Delauney3DFEMDomain >> no nodes are found in femdomain%mesh%nodcoord(:,:)"
+	endif
+	call obj%mesh%meshing(mode=3)
+
+end subroutine
+! ##################################################################
+
+! ##################################################################
+subroutine Delaunay2DFEMDomain(obj)
+	class(FEMDomain_),intent(inout) :: obj
+
+	if(.not. allocated(obj%mesh%nodcoord) )then
+		print *, "ERROR :: Delauney3DFEMDomain >> no nodes are found in femdomain%mesh%nodcoord(:,:)"
+	endif
+	call obj%mesh%meshing(delaunay2d=.true.)
+
+end subroutine
 ! ##################################################################
 
 end module FEMDomainClass

@@ -2,10 +2,24 @@ module SoilClass
     use, intrinsic :: iso_fortran_env
     use fem
     use FertilizerClass
+    use BoringClass
+    use DigitalElevationModelClass
     implicit none
+
 
     type :: Soil_
         type(FEMDomain_) :: FEMDomain
+        type(Boring_),allocatable :: Boring(:)
+        type(LinearSolver_) :: solver
+
+        real(real64),allocatable :: disp(:,:)
+        ! soil parameters
+        real(real64),allocatable :: YoungModulus(:)
+        real(real64),allocatable :: PoissonRatio(:)
+        real(real64),allocatable :: Density(:)
+        real(real64),allocatable :: VoidRatio(:)
+        real(real64),allocatable :: Cohesion(:)
+        real(real64),allocatable :: FrictionAngle(:)
 
         real(real64) :: depth
         real(real64) :: length
@@ -14,6 +28,8 @@ module SoilClass
         integer(int32) :: num_y
         integer(int32) :: num_z
         real(real64) :: x,y,z ! center coordinate
+
+        ! soil property
 
         ! ================
         ! Nutorient
@@ -44,6 +60,7 @@ module SoilClass
 
     contains
         procedure :: init => initSoil
+        procedure :: import => importSoil
         procedure :: create => initSoil
         procedure :: new => initSoil
         procedure :: resize => resizeSoil
@@ -51,12 +68,111 @@ module SoilClass
         procedure :: move => moveSoil
         procedure :: gmsh => gmshSoil
         procedure :: msh => mshSoil
+        procedure :: vtk => vtkSoil
+        procedure :: deform => deformSoil
+        procedure :: PreFlightCheck => PreFlightCheckSoil
         procedure :: fertilize => fertilizeSoil
         procedure :: diagnosis => diagnosisSoil
         procedure :: export => exportSoil
     end type
 
 contains
+! ################################################################
+
+
+! ################################################################
+subroutine importSoil(obj, name, boring, dem,x_num,y_num,z_num,radius,depth)
+    class(Soil_),intent(inout)::obj
+    character(*),optional,intent(in) :: name
+    type(Boring_),optional,intent(in) :: Boring(:)
+    type(DigitalElevationModel_),optional,intent(in) :: dem
+    integer(int32),optional,intent(in) :: x_num,y_num,z_num
+    real(real64),optional,intent(in) :: radius,depth
+    real(real64) :: radius_val,xlen,ylen,zlen,def_interval
+    real(real64) :: r_tr,original_z,new_z,depth_val,bottom_z
+    integer(int32) :: xnum,ynum,znum,DOF,i,j
+
+    !depth_val = input(default=-1.0d0,option=-abs(depth)
+
+    ! Boring core sampling data
+    if(present(Boring) )then
+        obj%Boring = Boring
+    endif
+
+    if(present(dem) )then
+        DOF = dem%NumberOfPoint() 
+        xnum = input(default=int(dble(DOF)**(1.0d0/3.0d0)),option=x_num)
+        ynum = input(default=int(dble(DOF)**(1.0d0/3.0d0)),option=y_num)
+        znum = input(default=int(dble(DOF)**(1.0d0/3.0d0)),option=z_num)
+
+        xlen = maxval(dem%x) - minval(dem%x)
+        ylen = maxval(dem%y) - minval(dem%y)
+        zlen = maxval(dem%z) - minval(dem%z)
+        ! create mesh
+        call obj%FEMDomain%create("Cube3D",x_num=xnum,y_num=ynum,z_num=znum)
+        call obj%FEMDomain%resize(x=xlen)
+        call obj%FEMDomain%resize(y=ylen)
+        call obj%FEMDomain%resize(z=minval(dem%z))
+        
+        call obj%FEMDomain%move(x=minval(dem%x)  )
+        call obj%FEMDomain%move(y=minval(dem%y)  )
+        !call obj%FEMDomain%move(z=minval(dem%z)  )
+
+        ! modify mesh
+        def_interval = maxval([xlen/dble(xnum),ylen/dble(ynum),zlen/dble(znum)])
+        radius_val = input(default=def_interval,option=radius)
+        do i=1,dem%NumberOfPoint()
+            do j=obj%femdomain%nn()-2*(xnum+1)*(ynum+1),obj%femdomain%nn()
+                r_tr = (dem%x(i)-obj%femdomain%mesh%nodcoord(j,1))**2
+                r_tr = r_tr + (dem%y(i)-obj%femdomain%mesh%nodcoord(j,2))**2
+                r_tr = sqrt(r_tr)
+                if(r_tr <= radius_val)then
+                    ! change coordinate
+                    !original_z = obj%femdomain%mesh%nodcoord(j,3)
+                    ! height original_z:-> 
+                    !new_z = original_z/zlen * dem%z(i) * &
+                    !    (radius_val - r_tr)*(radius_val - r_tr)/radius_val/radius_val
+                    obj%femdomain%mesh%nodcoord(j,3) = dem%z(i)
+                endif
+            enddo
+        enddo
+
+        do i=1,(xnum+1)*(ynum+1)
+            do j=1,znum
+                obj%femdomain%mesh%nodcoord((xnum+1)*(ynum+1)*(j-1)+i,3) = &
+                    obj%femdomain%mesh%nodcoord( (xnum+1)*(ynum+1)*znum+i ,3)*dble(j)/dble(znum+1)
+            enddo
+        enddo
+        bottom_z = minval(obj%femdomain%mesh%nodcoord(:,3) )
+        obj%femdomain%mesh%nodcoord( 1:(xnum+1)*(ynum+1),3) = bottom_z
+        
+
+        obj%YoungModulus = zeros(obj%femdomain%ne())
+        obj%PoissonRatio = zeros(obj%femdomain%ne())
+        obj%Density = zeros(obj%femdomain%ne())
+        obj%VoidRatio = zeros(obj%femdomain%ne())
+        obj%Cohesion = zeros(obj%femdomain%ne())
+        obj%FrictionAngle = zeros(obj%femdomain%ne())
+    endif
+
+    if(present(name) )then
+        if(index(name,".vtk")/=0 )then
+            call obj%femdomain%import(file=trim(name))
+            obj%YoungModulus = zeros(obj%femdomain%ne())
+            obj%PoissonRatio = zeros(obj%femdomain%ne())
+            obj%Density = zeros(obj%femdomain%ne())
+            obj%VoidRatio = zeros(obj%femdomain%ne())
+            obj%Cohesion = zeros(obj%femdomain%ne())
+            obj%FrictionAngle = zeros(obj%femdomain%ne())
+        else
+            print *, "ERROR :: importSoil >> only vtk ASCII format is readable."
+        endif
+    endif
+
+
+end subroutine
+! ################################################################
+
 
 ! ################################################################
 subroutine initSoil(obj,config,x_num,y_num,z_num)
@@ -68,10 +184,19 @@ subroutine initSoil(obj,config,x_num,y_num,z_num)
     integer(int32) :: i,j,k,blcount,id,rmc,n,node_id,node_id2,elemid
     type(IO_) :: soilconf
 
+
+    
+    obj%YoungModulus = zeros(obj%femdomain%ne())
+    obj%PoissonRatio = zeros(obj%femdomain%ne())
+    obj%Density = zeros(obj%femdomain%ne())
+    obj%VoidRatio = zeros(obj%femdomain%ne())
+    obj%Cohesion = zeros(obj%femdomain%ne())
+    obj%FrictionAngle = zeros(obj%femdomain%ne())
+
     ! 節を生成するためのスクリプトを開く
     if(.not.present(config).or. index(config,".json")==0 )then
         ! デフォルトの設定を生成
-        print *, "New soybean-configuration >> soilconfig.json"
+        print *, "New Soil-configuration >> soilconfig.json"
         call soilconf%open("soilconfig.json")
         write(soilconf%fh,*) '{'
         write(soilconf%fh,*) '   "type": "soil",'
@@ -104,7 +229,7 @@ subroutine initSoil(obj,config,x_num,y_num,z_num)
         if(blcount==1)then
             
             if(index(line,"type")/=0 .and. index(line,"soil")==0 )then
-                print *, "ERROR: This config-file is not for soybean"
+                print *, "ERROR: This config-file is not for Soil"
                 return
             endif
 
@@ -409,6 +534,20 @@ end subroutine
 ! ########################################
 
 ! ########################################
+subroutine vtkSoil(obj,name,scalar,vector,tensor,field,ElementType)
+    class(Soil_),intent(inout) :: obj
+	character(*),intent(in) :: name
+    character(*),optional,intent(in) :: field
+	real(real64),optional,intent(in) :: scalar(:),vector(:,:),tensor(:,:,:)
+	integer(int32),optional,intent(in) :: ElementType
+    
+    call obj%femdomain%vtk(name=name,scalar=scalar,vector=vector,tensor=tensor,&
+        field=field,ElementType=ElementType)
+    
+end subroutine
+! ########################################
+
+! ########################################
 subroutine resizeSoil(obj,x,y,z)
     class(Soil_),intent(inout) :: obj
     real(real64),optional,intent(in) :: x,y,z
@@ -449,5 +588,202 @@ subroutine mshSoil(obj,name)
     
 end subroutine
 ! ########################################
+
+
+! ########################################
+subroutine PreFlightCheckSoil(obj)
+    class(Soil_),target,intent(inout) :: obj
+    integer(int32) :: caution
+    
+    caution=0
+    print *, "PreFlightCheckList :: SoilClass >> started."
+    if(obj%femdomain%mesh%empty() )then
+        print *, "[CAUTION] Mesh is empty."   
+        caution=caution+1 
+    else
+        print *, "[ok] Mesh is ready."
+    endif
+    if(.not. allocated(obj%YoungModulus) )then
+        print *, "[CAUTION] soil % YoungModulus is not allocated."    
+        caution=caution+1 
+    else
+        print *, "[ok] soil % YoungModulus is allocated."
+        if(minval(obj%YoungModulus)<=0.0d0 )then
+            print *, "[CAUTION] soil % YoungModulus <= 0"  
+            caution = caution+1
+        endif
+    endif
+    if(.not. allocated(obj%PoissonRatio) )then
+        print *, "[CAUTION] soil % PoissonRatio is not allocated."  
+        caution=caution+1 
+    else
+        print *, "[ok] soil % PoissonRatio is allocated."
+        if(minval(obj%PoissonRatio)<=0.0d0 .or.maxval(obj%PoissonRatio)>1.0d0 )then
+            print *, "[CAUTION] soil % PoissonRatio <= 0 or soil % PoissonRatio > 1"  
+            caution = caution+1
+        endif  
+    endif
+    if(.not. allocated(obj%Density) )then
+        print *, "[CAUTION] soil % Density is not allocated."    
+        caution=caution+1 
+    else
+        print *, "[ok] soil % Density is allocated."
+        if(minval(obj%Density)<=0.0d0 )then
+            print *, "[CAUTION] soil % Density <= 0"  
+            caution = caution+1
+        endif  
+    endif
+    if(.not. allocated(obj%VoidRatio) )then
+        print *, "[CAUTION] soil % VoidRatio is not allocated."    
+        caution=caution+1 
+    else
+        print *, "[ok] soil % VoidRatio is allocated."
+        if(minval(obj%VoidRatio)==0.0d0 )then
+            print *, "[CAUTION] soil % VoidRatio = 0"  
+            caution = caution+1
+        endif  
+    endif
+    if(.not. allocated(obj%Cohesion) )then
+        print *, "[CAUTION] soil % Cohesion is not allocated."    
+        caution=caution+1 
+    else
+        print *, "[ok] soil % Cohesion is allocated."
+    endif
+    if(.not. allocated(obj%FrictionAngle) )then
+        print *, "[CAUTION] soil % FrictionAngle is not allocated."    
+        caution=caution+1 
+    else
+        print *, "[ok] soil % FrictionAngle is allocated."
+    endif
+    
+    if(caution == 0)then
+        print *, "[ok] PreFlightCheckListSoil successfully done!"
+    else
+        print *, "[Caution] Total ",caution,"events were found."
+    endif
+end subroutine
+! ########################################
+
+
+! ########################################
+subroutine deformSoil(obj,disp,x_min,x_max,y_min,y_max,z_min,z_max,BCRangeError) 
+    class(Soil_),target,intent(inout) :: obj
+    real(real64),optional,intent(in) :: disp(3)
+    real(real64),optional,intent(in) :: x_min,x_max,y_min,y_max,z_min,z_max,BCRangeError
+    type(FEMDomainp_),allocatable :: domainsp(:)
+    integer(int32),allocatable :: contactList(:,:)
+    integer(int32) :: i,j,numDomain,stemDomain,leafDomain,rootDomain
+    real(real64) :: penalty,displacement(3),GLevel,error
+    type(LinearSolver_) :: solver
+    integer(int32) :: ElementID
+    integer(int32),allocatable :: FixBoundary(:),DomainIDs(:)
+    real(real64),allocatable :: A_ij(:,:), x_i(:), b_i(:) ! A x = b
+
+    type(IO_) :: f
+
+    error = input(default=dble(1.0e-7),option=BCRangeError)
+
+
+    call solver%init(NumberOfNode=[obj%femdomain%nn()],DOF=3)
+
+    
+    ! create Elemental Matrices and Vectors
+    do ElementID=1, obj%femdomain%ne()
+
+        ! For 1st element, create stiffness matrix
+        A_ij = obj%femdomain%StiffnessMatrix(ElementID=ElementID, &
+            E=obj%YoungModulus(ElementID),&
+            v=obj%PoissonRatio(ElementID) )
+        b_i  = obj%femdomain%MassVector(&
+            ElementID=ElementID,&
+            DOF=obj%femdomain%nd() ,&
+            Density=obj%Density(ElementID),&
+            Accel=(/0.0d0, 0.0d0, -9.80d0/)&
+            )
+        DomainIDs=int(zeros( size(obj%femdomain%connectivity(ElementID=ElementID) ) )  )
+        DomainIDs(:)=1
+        ! assemble them 
+        call solver%assemble(&
+            connectivity=obj%femdomain%connectivity(ElementID=ElementID),&
+            DOF=obj%femdomain%nd() ,&
+            eMatrix=A_ij,&
+            DomainIDs=DomainIDs)
+        call solver%assemble(&
+            connectivity=obj%femdomain%connectivity(ElementID=ElementID),&
+            DOF=obj%femdomain%nd(),&
+            eVector=b_i,&
+            DomainIDs=DomainIDs)
+    enddo
+
+    ! set roler boundary in the sides
+    ! x-direction
+    call solver%prepareFix()
+
+    FixBoundary = obj%femdomain%select(x_max=minval(obj%femdomain%mesh%nodcoord(:,1))*(1.0d0-error) )
+    !print *, size(FixBoundary)
+    if(allocated(FixBoundary) )then
+        do i=1,size(FixBoundary)
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=1,entryvalue=0.0d0,row_DomainID=1)
+        enddo
+    endif
+
+    FixBoundary = obj%femdomain%select(x_min=maxval(obj%femdomain%mesh%nodcoord(:,1))*(1.0d0-error) )
+    !print *, size(FixBoundary)
+    if(allocated(FixBoundary) )then
+        do i=1,size(FixBoundary)
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=1,entryvalue=0.0d0,row_DomainID=1)
+        enddo
+    endif
+    
+    !y-direction
+    FixBoundary = obj%femdomain%select(y_max=minval(obj%femdomain%mesh%nodcoord(:,2))*(1.0d0-error) )
+    !print *, size(FixBoundary)
+    if(allocated(FixBoundary) )then
+        do i=1,size(FixBoundary)
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=2,entryvalue=0.0d0,row_DomainID=1)
+        enddo
+    endif
+    
+    FixBoundary = obj%femdomain%select(y_min=maxval(obj%femdomain%mesh%nodcoord(:,2))*(1.0d0-error) )
+    !print *, size(FixBoundary)
+    if(allocated(FixBoundary) )then
+        do i=1,size(FixBoundary)
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=2,entryvalue=0.0d0,row_DomainID=1)
+        enddo
+    endif
+
+
+    !z-direction
+    FixBoundary = obj%femdomain%select(z_max=minval(obj%femdomain%mesh%nodcoord(:,3))*(1.0d0-error) )
+    !print *, size(FixBoundary)
+    if(allocated(FixBoundary) )then
+        do i=1,size(FixBoundary)
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=3,entryvalue=0.0d0,row_DomainID=1)
+        enddo
+    endif
+    
+    ! fix deformation >> Dirichlet Boundary
+    FixBoundary = obj%femdomain%select(x_min=x_min,x_max=x_max,&
+        y_min=y_min,y_max=y_max,z_min=z_min,z_max=z_max)
+    if(allocated(FixBoundary) .and. present(disp) )then
+        do i=1,size(FixBoundary)
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=1,entryvalue=disp(1),row_DomainID=1 )
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=2,entryvalue=disp(2),row_DomainID=1 )
+            call solver%fix(nodeid=FixBoundary(i),DOF=3,EntryID=3,entryvalue=disp(3),row_DomainID=1 )
+        enddo
+    endif
+    
+    ! solve > get displacement
+    call solver%solve("BiCGSTAB")
+
+    obj%solver = solver
+
+    ! update mesh
+    obj%femdomain%mesh%nodcoord(:,:) =obj%femdomain%mesh%nodcoord(:,:) &
+        + reshape(solver%x,obj%femdomain%nn(),obj%femdomain%nd() )
+    obj%disp = reshape(solver%x,obj%femdomain%nn(),obj%femdomain%nd() )
+    
+end subroutine
+
 
 end module

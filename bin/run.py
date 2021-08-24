@@ -36,7 +36,8 @@ if __name__ == '__main__':
     #print(args.bravo)
     #print(args.charlie)
     #print(args.delta)
-    ofiles = os.path.exists("./inc/obj.o")
+    expath=os.path.expandvars(".")
+    ofiles = os.path.exists(expath+"/inc/obj.o") 
 
     
     if str(args.script) == "install":
@@ -44,13 +45,13 @@ if __name__ == '__main__':
 
     if ofiles == False:
         if yes_no_input():
-            os.system("python3 install.py")
-            print("[ok] SiCroF has been installed.")
+            os.system("python3 ./install.py")
+            print("[ok] plantFEM has been installed.")
         else:
-            print("[Caution] SiCroF is not installed yet.\n")
-            time.sleep(3)
+            print("[Caution] plantFEM is not installed yet.\n")
+            time.sleep(1)
     else:
-        print("[ok] SiCroF has been installed.")
+        print("[ok] plantFEM has been installed.")
 
 
     print("Detecting OS type...")
